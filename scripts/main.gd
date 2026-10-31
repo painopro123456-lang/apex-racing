@@ -486,10 +486,23 @@ func _build_track(track_index: int) -> void:
 	var curb_red := _mat(Color(0.88, 0.055, 0.06))
 	var curb_white := _mat(Color(0.88, 0.88, 0.84))
 	var barrier_mat := _mat(Color(0.72, 0.75, 0.78))
+	# The visible road also needs a physical surface or the player's car falls through it.
+	var road_physics := StaticBody3D.new()
+	road_physics.collision_layer = 1
+	road_physics.collision_mask = 0
+	add_child(road_physics)
 	for i in range(points.size()):
 		var p1: Vector3 = points[i]
 		var p2: Vector3 = points[(i + 1) % points.size()]
 		_road_piece(p1, p2, 15.0, road_mat)
+		var segment_direction := p2 - p1
+		var road_collision := CollisionShape3D.new()
+		var road_shape := BoxShape3D.new()
+		road_shape.size = Vector3(15.0, 0.5, segment_direction.length() + 0.3)
+		road_collision.shape = road_shape
+		road_collision.position = (p1 + p2) * 0.5 + Vector3(0, -0.25, 0)
+		road_collision.rotation.y = atan2(-segment_direction.x, -segment_direction.z)
+		road_physics.add_child(road_collision)
 		var outward1 := p1.normalized()
 		var outward2 := p2.normalized()
 		var curb_material: Material = curb_red if i % 2 == 0 else curb_white
@@ -670,7 +683,8 @@ func _build_player() -> void:
 	player = CharacterBody3D.new()
 	player.set_script(PLAYER_SCRIPT)
 	player.collision_layer = 1
-	player.collision_mask = 0
+	player.collision_mask = 1
+	player.add_to_group("player_car")
 	var player_hitbox := CollisionShape3D.new()
 	var player_shape := BoxShape3D.new()
 	player_shape.size = Vector3(1.8, 1.0, 4.0)
@@ -705,8 +719,10 @@ func _build_ai() -> void:
 			ai.set_script(AI_SCRIPT)
 			ai.driver_name = DRIVERS_BY_TEAM[team_index][driver_index]
 			ai.driver_number = DRIVER_NUMBERS_BY_TEAM[team_index][driver_index]
-			ai.lane_offset = -5.0 + float(grid_index % 6) * 1.8
-			ai.phase = float(grid_index) / 21.0
+			var grid_row := int(grid_index / 2) + 1
+			ai.lane_offset = -2.1 if grid_index % 2 == 0 else 2.1
+			# Two-wide starting rows placed just behind the start/finish line.
+			ai.phase = fposmod(1.0 - float(grid_row * 2) / float(track_points.size()), 1.0)
 			ai.track_points = track_points
 			var difficulty_multipliers := [0.72, 0.84, 0.96, 1.08, 1.20]
 			ai.speed_factor = (0.78 + float(grid_index % 7) * 0.035) * difficulty_multipliers[ai_difficulty]
