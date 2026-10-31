@@ -699,14 +699,14 @@ func _named_circuit_points(track_index: int, count: int) -> Array[Vector3]:
 	for i in range(count):
 		var scaled := float(i) / float(count) * float(segment_count)
 		var segment := int(floor(scaled)) % segment_count
-		var t := scaled - floor(scaled)
+		var t: float = scaled - floor(scaled)
 		var p0: Vector2 = control[(segment - 1 + segment_count) % segment_count]
 		var p1: Vector2 = control[segment]
 		var p2: Vector2 = control[(segment + 1) % segment_count]
 		var p3: Vector2 = control[(segment + 2) % segment_count]
-		var t2 := t * t
-		var t3 := t2 * t
-		var point := 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+		var t2: float = t * t
+		var t3: float = t2 * t
+		var point: Vector2 = 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
 		points.append(Vector3(point.x * 72.0, 0.0, point.y * 51.0))
 	return points
 
