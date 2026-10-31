@@ -77,7 +77,11 @@ func _physics_process(delta: float) -> void:
 	side = global_transform.basis.x
 	velocity.x = forward.x * forward_speed + side.x * side_speed
 	velocity.z = forward.z * forward_speed + side.z * side_speed
-	velocity.y = -1.0
+	# Keep the car grounded by the track collider while still allowing it to fall if it leaves the road.
+	if is_on_floor():
+		velocity.y = 0.0
+	else:
+		velocity.y -= 24.0 * delta
 	speed = abs(forward_speed)
 	if throttle_input > 0.05 and fuel_remaining > 0.0:
 		fuel_remaining = max(0.0, fuel_remaining - delta * (0.045 + throttle_input * 0.12))
