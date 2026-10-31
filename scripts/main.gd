@@ -3,13 +3,34 @@ extends Node3D
 const PLAYER_SCRIPT = preload("res://scripts/player_car.gd")
 const AI_SCRIPT = preload("res://scripts/ai_car.gd")
 
-const TEAM_NAMES := ["Apex GP", "Scuderia Rosso", "Silver Arrow", "Papaya Racing", "Emerald Motorsport", "BluePeak Racing", "Violet Works", "Titan Racing", "Cyan Velocity", "Racing Bulls"]
-const TEAM_COLORS := [
-	Color(0.04, 0.30, 0.95), Color(0.86, 0.08, 0.06), Color(0.78, 0.82, 0.88),
-	Color(1.0, 0.42, 0.04), Color(0.05, 0.48, 0.25), Color(0.05, 0.18, 0.58),
-	Color(0.42, 0.12, 0.65), Color(0.12, 0.12, 0.15), Color(0.05, 0.62, 0.68), Color(0.72, 0.76, 0.8)
+const TEAM_NAMES := [
+	"McLaren", "Mercedes", "Red Bull Racing", "Ferrari", "Williams",
+	"Racing Bulls", "Aston Martin", "Haas", "Audi", "Alpine", "Cadillac"
 ]
-const DRIVERS := ["Alex Mercer", "Luca Moretti", "Noah Bennett", "Theo Laurent", "Mika Sato", "Rafael Costa", "Ethan Cole", "Daniel Novak", "Oliver Hayes", "Mateo Silva", "Kai Nakamura", "Leo Fischer", "Adam Walker", "Enzo Ricci", "Finn Andersson", "Jules Martin", "Samir Haddad", "Oscar Reid", "Nico Weber", "Tomas Vega"]
+# Approximate team colour palettes for menu/car identification; these are not official liveries.
+const TEAM_COLORS := [
+	Color(1.0, 0.40, 0.05), Color(0.00, 0.72, 0.68), Color(0.05, 0.10, 0.30),
+	Color(0.82, 0.04, 0.08), Color(0.05, 0.22, 0.72), Color(0.12, 0.30, 0.62),
+	Color(0.02, 0.30, 0.18), Color(0.18, 0.20, 0.23), Color(0.65, 0.69, 0.73),
+	Color(0.02, 0.25, 0.65), Color(0.08, 0.09, 0.12)
+]
+const DRIVERS_BY_TEAM := [
+	["Lando Norris", "Oscar Piastri"],
+	["George Russell", "Kimi Antonelli"],
+	["Max Verstappen", "Isack Hadjar"],
+	["Charles Leclerc", "Lewis Hamilton"],
+	["Alex Albon", "Carlos Sainz"],
+	["Liam Lawson", "Arvid Lindblad"],
+	["Fernando Alonso", "Lance Stroll"],
+	["Esteban Ocon", "Oliver Bearman"],
+	["Nico Hulkenberg", "Gabriel Bortoleto"],
+	["Pierre Gasly", "Franco Colapinto"],
+	["Sergio Perez", "Valtteri Bottas"]
+]
+const DRIVER_NUMBERS_BY_TEAM := [
+	["1", "81"], ["63", "12"], ["3", "6"], ["16", "44"], ["23", "55"],
+	["30", "41"], ["14", "18"], ["31", "87"], ["27", "5"], ["10", "43"], ["11", "77"]
+]
 const TRACKS := ["Apex GP Oval", "Desert Ring", "Harbor Grand Prix"]
 
 var player: CharacterBody3D
@@ -86,10 +107,13 @@ func _build_menu() -> void:
 	_add_menu_label(column, "YOUR DRIVER")
 	var driver_select := OptionButton.new()
 	driver_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for driver in DRIVERS:
-		driver_select.add_item(driver)
-	driver_select.selected = selected_driver
+	_populate_driver_select(driver_select)
 	driver_select.item_selected.connect(func(index: int): selected_driver = index)
+	team_select.item_selected.connect(func(index: int):
+		selected_team = index
+		selected_driver = 0
+		_populate_driver_select(driver_select)
+	)
 	column.add_child(driver_select)
 	_add_menu_label(column, "CIRCUIT")
 	var track_select := OptionButton.new()
@@ -100,7 +124,7 @@ func _build_menu() -> void:
 	track_select.item_selected.connect(func(index: int): selected_track = index)
 	column.add_child(track_select)
 	var info := Label.new()
-	info.text = "10 teams  •  20 selectable drivers  •  3 circuits  •  12-car field"
+	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  12-car field"
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88))
 	column.add_child(info)
@@ -111,11 +135,19 @@ func _build_menu() -> void:
 	start.pressed.connect(_start_race)
 	column.add_child(start)
 	var note := Label.new()
-	note.text = "Prototype roster and car visuals are fictional placeholders."
+	note.text = "2026 driver roster • team colours are approximate, not official liveries."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.add_theme_font_size_override("font_size", 11)
 	note.add_theme_color_override("font_color", Color(0.58, 0.62, 0.7))
 	column.add_child(note)
+
+func _populate_driver_select(driver_select: OptionButton) -> void:
+	driver_select.clear()
+	for i in range(DRIVERS_BY_TEAM[selected_team].size()):
+		var driver_name: String = DRIVERS_BY_TEAM[selected_team][i]
+		var driver_number: String = DRIVER_NUMBERS_BY_TEAM[selected_team][i]
+		driver_select.add_item("%s  (#%s)" % [driver_name, driver_number])
+	driver_select.select(selected_driver)
 
 func _add_menu_label(parent: VBoxContainer, text_value: String) -> void:
 	var label := Label.new()
@@ -254,7 +286,7 @@ func _build_hud() -> void:
 	var column := VBoxContainer.new()
 	panel.add_child(column)
 	var title := Label.new()
-	title.text = "%s  /  %s" % [TEAM_NAMES[selected_team], DRIVERS[selected_driver]]
+	title.text = "%s  /  %s  (#%s)" % [TEAM_NAMES[selected_team], DRIVERS_BY_TEAM[selected_team][selected_driver], DRIVER_NUMBERS_BY_TEAM[selected_team][selected_driver]]
 	title.add_theme_font_size_override("font_size", 15)
 	column.add_child(title)
 	speed_label = Label.new()
