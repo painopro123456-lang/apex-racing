@@ -65,7 +65,8 @@ var sector_current := 1
 var sector_elapsed := 0.0
 var sector_last_index := -1
 var sector_times: Array[float] = [0.0, 0.0, 0.0]
-var graphics_quality := 1
+var graphics_quality := 2
+var material_cache: Dictionary = {}
 var world_environment: WorldEnvironment
 var sun_light: DirectionalLight3D
 
@@ -105,18 +106,21 @@ func _build_environment() -> void:
 	add_child(ground)
 
 func _apply_graphics_quality() -> void:
-	var shadow_distances := [65.0, 110.0, 160.0, 220.0]
-	var fog_levels := [0.0009, 0.0018, 0.0022, 0.0026]
-	var ambient_levels := [0.78, 0.95, 1.0, 1.05]
+	# High is the default; Low cuts shadows and anti-aliasing for integrated GPUs.
+	var shadow_distances := [55.0, 95.0, 155.0, 210.0]
+	var fog_levels := [0.0008, 0.0014, 0.0019, 0.0022]
+	var ambient_levels := [0.82, 0.9, 0.98, 1.02]
+	var aa_modes := [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X, Viewport.MSAA_4X]
+	get_viewport().msaa_3d = aa_modes[graphics_quality]
 	if is_instance_valid(sun_light):
-		sun_light.shadow_enabled = graphics_quality > 0
+		sun_light.shadow_enabled = graphics_quality >= 1
 		sun_light.directional_shadow_max_distance = shadow_distances[graphics_quality]
 	if is_instance_valid(world_environment) and world_environment.environment:
 		world_environment.environment.fog_enabled = graphics_quality >= 1
 		world_environment.environment.fog_density = fog_levels[graphics_quality]
 		world_environment.environment.ambient_light_energy = ambient_levels[graphics_quality]
-		world_environment.environment.ssao_enabled = graphics_quality >= 2
-
+		world_environment.environment.ssao_enabled = false
+		world_environment.environment.ssil_enabled = false
 func _build_menu() -> void:
 	menu_layer = CanvasLayer.new()
 	add_child(menu_layer)
@@ -545,7 +549,7 @@ func _add_car_cylinder(parent: Node3D, radius: float, height: float, pos: Vector
 	mesh.height = height
 	mesh.radial_segments = 12
 	node.mesh = mesh
-	node.material_override = _mat(color)
+	node.material_override = _car_mat(color)
 	node.position = pos
 	node.rotation.z = PI / 2.0
 	parent.add_child(node)
@@ -555,7 +559,7 @@ func _add_car_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> 
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	node.mesh = mesh
-	node.material_override = _mat(color)
+	node.material_override = _car_mat(color)
 	node.position = pos
 	parent.add_child(node)
 
@@ -568,10 +572,24 @@ func _add_box(pos: Vector3, size: Vector3, color: Color) -> void:
 	node.position = pos
 	add_child(node)
 
-func _mat(color: Color) -> StandardMaterial3D:
+func _car_mat(color: Color) -> StandardMaterial3D:
+	var key := "car_" + color.to_html(true)
+	if material_cache.has(key):
+		return material_cache[key]
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
-	material.roughness = 0.82
+	material.roughness = 0.34 if color.get_luminance() > 0.12 else 0.88
+	material.metallic = 0.18 if color.get_luminance() > 0.12 else 0.02
+	material_cache[key] = material
+	return material
+
+func _mat(color: Color) -> StandardMaterial3D:
+	if material_cache.has(color):
+		return material_cache[color]
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.76
+	material_cache[color] = material
 	return material
 
 func _build_hud() -> void:
