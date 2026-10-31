@@ -810,8 +810,12 @@ func _build_player() -> void:
 	add_child(player)
 	_car_visual(player, TEAM_COLORS[selected_team], selected_team, selected_car_era)
 	var camera := Camera3D.new()
-	camera.position = Vector3(0, 4.8, 10.5)
-	camera.rotation_degrees = Vector3(-18, 0, 0)
+	# Default F1-style T-cam: mounted above the cockpit and facing forward,
+	# rather than a distant third-person chase camera.
+	camera.position = Vector3(0, 2.05, -0.15)
+	camera.rotation_degrees = Vector3(-3, 0, 0)
+	camera.fov = 100.0
+	camera.near = 0.05
 	camera.current = true
 	player.add_child(camera)
 
