@@ -29,11 +29,25 @@ jobs:
           cp -a templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Import project assets
-        run: godot --headless --editor --path . --quit
+      - name: Import assets and validate scripts
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --editor --path . --quit 2>&1 | tee godot-import.log
+          if grep -E 'SCRIPT ERROR:|ERROR:' godot-import.log; then
+            echo "Godot reported script or resource errors during import."
+            exit 1
+          fi
 
       - name: Launch smoke test
-        run: godot --headless --path . --quit-after 8
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --quit-after 8 2>&1 | tee godot-smoke.log
+          if grep -E 'SCRIPT ERROR:|ERROR:' godot-smoke.log; then
+            echo "Godot reported errors while launching the main scene."
+            exit 1
+          fi
 
       - name: Export Windows executable
         run: |
