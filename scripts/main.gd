@@ -65,6 +65,9 @@ var sector_current := 1
 var sector_elapsed := 0.0
 var sector_last_index := -1
 var sector_times: Array[float] = [0.0, 0.0, 0.0]
+var graphics_quality := 1
+var world_environment: WorldEnvironment
+var sun_light: DirectionalLight3D
 
 func _ready() -> void:
 	_build_environment()
@@ -72,6 +75,7 @@ func _ready() -> void:
 
 func _build_environment() -> void:
 	var env_node := WorldEnvironment.new()
+	world_environment = env_node
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.32, 0.49, 0.67)
@@ -86,6 +90,7 @@ func _build_environment() -> void:
 	env_node.environment = env
 	add_child(env_node)
 	var sun := DirectionalLight3D.new()
+	sun_light = sun
 	sun.rotation_degrees = Vector3(-52, -28, 0)
 	sun.shadow_enabled = true
 	sun.light_energy = 1.25
@@ -98,6 +103,19 @@ func _build_environment() -> void:
 	ground.material_override = _mat(Color(0.10, 0.24, 0.13))
 	ground.position.y = -0.2
 	add_child(ground)
+
+func _apply_graphics_quality() -> void:
+	var shadow_distances := [65.0, 110.0, 160.0, 220.0]
+	var fog_levels := [0.0009, 0.0018, 0.0022, 0.0026]
+	var ambient_levels := [0.78, 0.95, 1.0, 1.05]
+	if is_instance_valid(sun_light):
+		sun_light.shadow_enabled = graphics_quality > 0
+		sun_light.directional_shadow_max_distance = shadow_distances[graphics_quality]
+	if is_instance_valid(world_environment) and world_environment.environment:
+		world_environment.environment.fog_enabled = graphics_quality >= 1
+		world_environment.environment.fog_density = fog_levels[graphics_quality]
+		world_environment.environment.ambient_light_energy = ambient_levels[graphics_quality]
+		world_environment.environment.ssao_enabled = graphics_quality >= 2
 
 func _build_menu() -> void:
 	menu_layer = CanvasLayer.new()
@@ -161,6 +179,14 @@ func _build_menu() -> void:
 	tyre_select.select(1)
 	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
 	column.add_child(tyre_select)
+	_add_menu_label(column, "GRAPHICS QUALITY")
+	var quality_select := OptionButton.new()
+	quality_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for quality_name in ["LOW  •  INTEGRATED GPU", "BALANCED", "HIGH", "ULTRA"]:
+		quality_select.add_item(quality_name)
+	quality_select.select(graphics_quality)
+	quality_select.item_selected.connect(func(index: int): graphics_quality = index)
+	column.add_child(quality_select)
 	var info := Label.new()
 	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  22-car grid"
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -198,6 +224,7 @@ func _start_race() -> void:
 	if race_started:
 		return
 	race_started = true
+	_apply_graphics_quality()
 	menu_layer.queue_free()
 	_build_track(selected_track)
 	_build_player()
@@ -253,7 +280,8 @@ func _add_trackside_scenery(points: Array[Vector3]) -> void:
 	var foliage_mat := _mat(Color(0.10, 0.29, 0.16))
 	var stand_mat := _mat(Color(0.20, 0.23, 0.29))
 	var seat_mat := _mat(Color(0.78, 0.80, 0.84))
-	for i in range(5, points.size(), 12):
+	var scenery_step := [24, 12, 8, 5][graphics_quality]
+	for i in range(5, points.size(), scenery_step):
 		var p: Vector3 = points[i]
 		var outward := Vector3(p.x, 0.0, p.z).normalized()
 		for side in [-1.0, 1.0]:
