@@ -573,26 +573,32 @@ func _build_track(track_index: int) -> void:
 	var points: Array[Vector3] = []
 	match track_index:
 		0:
-			for i in range(128):
-				var a := TAU * float(i) / 128.0
-				points.append(Vector3(cos(a) * 52.0, 0, sin(a) * 52.0))
-		1:
-			points = _rounded_rect_points(78.0, 42.0, 15.0, 128)
-		2:
 			for i in range(160):
 				var a := TAU * float(i) / 160.0
-				var radius_x := 58.0 + 13.0 * sin(3.0 * a) + 5.0 * cos(5.0 * a)
-				var radius_z := 43.0 + 9.0 * cos(2.0 * a)
+				points.append(Vector3(cos(a) * 52.0, 0, sin(a) * 52.0))
+		1:
+			points = _rounded_rect_points(78.0, 42.0, 15.0, 160)
+		2:
+			for i in range(192):
+				var a := TAU * float(i) / 192.0
+				var radius_x := 58.0 + 16.0 * sin(3.0 * a) + 7.0 * cos(5.0 * a) + 3.0 * sin(7.0 * a)
+				var radius_z := 43.0 + 12.0 * cos(2.0 * a) + 5.0 * sin(4.0 * a)
 				points.append(Vector3(cos(a) * radius_x, 0, sin(a) * radius_z))
 		_:
-			points = _named_circuit_points(track_index, 192)
+			points = _named_circuit_points(track_index, 256)
 	track_points = points
 	track_radius = 52.0 if track_index == 0 else 57.0
-	var road_mat := _mat(Color(0.105, 0.115, 0.13))
-	var curb_red := _mat(Color(0.88, 0.055, 0.06))
-	var curb_white := _mat(Color(0.88, 0.88, 0.84))
-	var barrier_mat := _mat(Color(0.72, 0.75, 0.78))
-	# The visible road also needs a physical surface or the player's car falls through it.
+
+	var road_mat := _mat(Color(0.075, 0.083, 0.095))
+	var runoff_mat := _mat(Color(0.24, 0.27, 0.29))
+	var curb_red := _mat(Color(0.86, 0.035, 0.045))
+	var curb_white := _mat(Color(0.92, 0.92, 0.87))
+	var barrier_mat := _mat(Color(0.43, 0.48, 0.53))
+	# Continuous triangulated ribbons replace the old disconnected road slabs.
+	_add_track_ribbon(points, -13.2, -7.55, 0.015, runoff_mat)
+	_add_track_ribbon(points, 7.55, 13.2, 0.015, runoff_mat)
+	_add_track_ribbon(points, -7.5, 7.5, 0.105, road_mat)
+
 	var road_physics := StaticBody3D.new()
 	road_physics.collision_layer = 1
 	road_physics.collision_mask = 0
@@ -600,27 +606,63 @@ func _build_track(track_index: int) -> void:
 	for i in range(points.size()):
 		var p1: Vector3 = points[i]
 		var p2: Vector3 = points[(i + 1) % points.size()]
-		_road_piece(p1, p2, 15.0, road_mat)
-		var segment_direction := p2 - p1
+		var direction := (p2 - p1).normalized()
+		var lateral := Vector3(-direction.z, 0.0, direction.x)
 		var road_collision := CollisionShape3D.new()
 		var road_shape := BoxShape3D.new()
-		road_shape.size = Vector3(15.0, 0.5, segment_direction.length() + 0.3)
+		road_shape.size = Vector3(15.0, 0.5, p1.distance_to(p2) + 0.35)
 		road_collision.shape = road_shape
 		road_collision.position = (p1 + p2) * 0.5 + Vector3(0, -0.25, 0)
-		road_collision.rotation.y = atan2(-segment_direction.x, -segment_direction.z)
+		road_collision.rotation.y = atan2(-direction.x, -direction.z)
 		road_physics.add_child(road_collision)
-		var outward1 := p1.normalized()
-		var outward2 := p2.normalized()
-		var curb_material: Material = curb_red if i % 2 == 0 else curb_white
-		_road_piece(p1 + outward1 * 8.2, p2 + outward2 * 8.2, 1.15, curb_material)
-		_road_piece(p1 - outward1 * 8.2, p2 - outward2 * 8.2, 1.15, curb_material)
-		if i % 2 == 0:
-			_barrier_piece(p1 + outward1 * 11.0, p2 + outward2 * 11.0, barrier_mat)
-			_barrier_piece(p1 - outward1 * 11.0, p2 - outward2 * 11.0, barrier_mat)
+
+		# Alternating raised kerb blocks follow the true local track edge.
+		var curb_material: Material = curb_red if int(i / 3) % 2 == 0 else curb_white
+		if i % 3 == 0:
+			_road_piece(p1 + lateral * 8.05 + Vector3.UP * 0.12, p2 + lateral * 8.05 + Vector3.UP * 0.12, 1.0, curb_material)
+			_road_piece(p1 - lateral * 8.05 + Vector3.UP * 0.12, p2 - lateral * 8.05 + Vector3.UP * 0.12, 1.0, curb_material)
+		# Armco barriers with regular supports, rather than oversized white blocks.
+		if i % 8 == 0:
+			_barrier_piece(p1 + lateral * 14.0, p2 + lateral * 14.0, barrier_mat)
+			_barrier_piece(p1 - lateral * 14.0, p2 - lateral * 14.0, barrier_mat)
+
 	_add_start_finish_line(points, road_mat)
 	_add_trackside_scenery(points)
 	_add_pit_lane(points, road_mat)
-	_add_box(Vector3(0, 1, -track_radius - 17), Vector3(38, 2, 8), Color(0.68, 0.73, 0.8))
+	_add_box(Vector3(0, 1, -track_radius - 17), Vector3(38, 2, 8), Color(0.22, 0.27, 0.34))
+
+func _add_track_ribbon(points: Array[Vector3], inner_offset: float, outer_offset: float, y: float, material: Material) -> void:
+	if points.size() < 3:
+		return
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface.set_material(material)
+	var count := points.size()
+	for i in range(count):
+		var previous: Vector3 = points[(i - 1 + count) % count]
+		var following: Vector3 = points[(i + 1) % count]
+		var tangent := (following - previous).normalized()
+		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
+		var inner := points[i] + lateral * inner_offset + Vector3.UP * y
+		var outer := points[i] + lateral * outer_offset + Vector3.UP * y
+		var next_previous: Vector3 = points[(i + 1) % count]
+		var next_following: Vector3 = points[(i + 2) % count]
+		var next_tangent := (next_following - points[i]).normalized()
+		var next_lateral := Vector3(-next_tangent.z, 0.0, next_tangent.x)
+		var next_inner := next_previous + next_lateral * inner_offset + Vector3.UP * y
+		var next_outer := next_previous + next_lateral * outer_offset + Vector3.UP * y
+		surface.add_vertex(inner)
+		surface.add_vertex(outer)
+		surface.add_vertex(next_inner)
+		surface.add_vertex(outer)
+		surface.add_vertex(next_outer)
+		surface.add_vertex(next_inner)
+	surface.generate_normals()
+	var mesh := surface.commit()
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
 
 func _named_circuit_points(track_index: int, count: int) -> Array[Vector3]:
 	# Distinct fictionalised centreline layouts inspired by the character of each venue.
@@ -653,67 +695,136 @@ func _named_circuit_points(track_index: int, count: int) -> Array[Vector3]:
 	return points
 
 func _add_trackside_scenery(points: Array[Vector3]) -> void:
-	# Sparse, low-poly trackside dressing keeps the circuit readable on integrated GPUs.
-	var trunk_mat := _mat(Color(0.22, 0.14, 0.08))
-	var foliage_mat := _mat(Color(0.10, 0.29, 0.16))
-	var stand_mat := _mat(Color(0.20, 0.23, 0.29))
-	var seat_mat := _mat(Color(0.78, 0.80, 0.84))
-	var scenery_step: int = [24, 12, 8, 5][graphics_quality]
-	for i in range(5, points.size(), scenery_step):
+	var trunk_mat := _mat(Color(0.20, 0.13, 0.08))
+	var foliage_mat := _mat(Color(0.075, 0.23, 0.12))
+	var stand_mat := _mat(Color(0.12, 0.16, 0.22))
+	var roof_mat := _mat(Color(0.045, 0.065, 0.09))
+	var glass_mat := _mat(Color(0.10, 0.25, 0.34))
+	var seat_mat := _mat(Color(0.82, 0.84, 0.88))
+	var scenery_step: int = [28, 18, 12, 8][graphics_quality]
+	for i in range(8, points.size(), scenery_step):
 		var p: Vector3 = points[i]
-		var outward := Vector3(p.x, 0.0, p.z).normalized()
+		var previous: Vector3 = points[(i - 1 + points.size()) % points.size()]
+		var following: Vector3 = points[(i + 1) % points.size()]
+		var tangent := (following - previous).normalized()
+		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
 		for side in [-1.0, 1.0]:
-			var location: Vector3 = p + outward * side * 20.0
-			var trunk := MeshInstance3D.new()
-			var trunk_mesh := CylinderMesh.new()
-			trunk_mesh.top_radius = 0.22
-			trunk_mesh.bottom_radius = 0.32
-			trunk_mesh.height = 2.2
-			trunk.mesh = trunk_mesh
-			trunk.material_override = trunk_mat
-			trunk.position = location + Vector3(0, 1.1, 0)
-			add_child(trunk)
-			var crown := MeshInstance3D.new()
-			var crown_mesh := SphereMesh.new()
-			crown_mesh.radius = 1.35
-			crown_mesh.height = 2.7
-			crown.mesh = crown_mesh
-			crown.material_override = foliage_mat
-			crown.position = location + Vector3(0, 2.9, 0)
-			add_child(crown)
-	# A compact grandstand gives the start/finish area a stronger race-event feel.
+			var location: Vector3 = p + lateral * side * 24.0
+			# Clustered trees with varied crowns, not identical lollipop props.
+			if i % (scenery_step * 2) == 8:
+				for tree_index in range(3):
+					var offset := location + tangent * (float(tree_index) - 1.0) * 5.0
+					var trunk := MeshInstance3D.new()
+					var trunk_mesh := CylinderMesh.new()
+					trunk_mesh.top_radius = 0.18
+					trunk_mesh.bottom_radius = 0.28
+					trunk_mesh.height = 2.5
+					trunk.mesh = trunk_mesh
+					trunk.material_override = trunk_mat
+					trunk.position = offset + Vector3(0, 1.25, 0)
+					add_child(trunk)
+					var crown := MeshInstance3D.new()
+					var crown_mesh := SphereMesh.new()
+					crown_mesh.radius = 1.8
+					crown_mesh.height = 3.1
+					crown.mesh = crown_mesh
+					crown.material_override = foliage_mat
+					crown.position = offset + Vector3(0, 3.0, 0)
+					crown.scale = Vector3(1.0, 0.8, 1.0)
+					add_child(crown)
+
+	# Main grandstand: tiered seating, roof canopy and structural supports.
 	if points.size() > 24:
 		var centre: Vector3 = points[12]
 		var tangent := (points[13] - points[11]).normalized()
 		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
-		var stand_origin := centre + lateral * 25.0
-		for tier in range(4):
+		var origin := centre + lateral * 27.0
+		for tier in range(6):
 			var tier_box := MeshInstance3D.new()
 			var tier_mesh := BoxMesh.new()
-			tier_mesh.size = Vector3(17.0 - float(tier) * 1.8, 0.65, 2.0)
+			tier_mesh.size = Vector3(29.0 - float(tier) * 1.2, 0.55, 2.1)
 			tier_box.mesh = tier_mesh
 			tier_box.material_override = stand_mat
-			tier_box.position = stand_origin + Vector3(0, 1.0 + float(tier) * 0.72, -float(tier) * 1.4)
+			tier_box.position = origin + Vector3(0, 1.0 + float(tier) * 0.68, -float(tier) * 1.0)
 			tier_box.rotation.y = atan2(-tangent.x, -tangent.z)
 			add_child(tier_box)
 			var seat_strip := MeshInstance3D.new()
 			var seat_mesh := BoxMesh.new()
-			seat_mesh.size = Vector3(16.0 - float(tier) * 1.8, 0.12, 0.18)
+			seat_mesh.size = Vector3(27.0 - float(tier) * 1.2, 0.12, 0.16)
 			seat_strip.mesh = seat_mesh
 			seat_strip.material_override = seat_mat
-			seat_strip.position = tier_box.position + Vector3(0, 0.38, 0.72)
+			seat_strip.position = tier_box.position + Vector3(0, 0.31, 0.72)
 			seat_strip.rotation.y = tier_box.rotation.y
 			add_child(seat_strip)
+		var canopy := MeshInstance3D.new()
+		var canopy_mesh := BoxMesh.new()
+		canopy_mesh.size = Vector3(34.0, 0.5, 13.0)
+		canopy.mesh = canopy_mesh
+		canopy.material_override = roof_mat
+		canopy.position = origin + Vector3(0, 5.7, -2.0)
+		canopy.rotation.y = atan2(-tangent.x, -tangent.z)
+		add_child(canopy)
+		for side in [-1.0, 1.0]:
+			var support := MeshInstance3D.new()
+			var support_mesh := BoxMesh.new()
+			support_mesh.size = Vector3(0.55, 5.4, 0.55)
+			support.mesh = support_mesh
+			support.material_override = roof_mat
+			support.position = origin + lateral * side * 15.5 + Vector3(0, 2.7, -1.0)
+			add_child(support)
+
+	# Modern pit/hospitality building with glass facade and flat roof.
+	var building_point: Vector3 = points[points.size() / 8]
+	var building_tangent := (points[points.size() / 8 + 1] - points[points.size() / 8 - 1]).normalized()
+	var building_lateral := Vector3(-building_tangent.z, 0.0, building_tangent.x)
+	var building_origin := building_point + building_lateral * 29.0
+	_add_box(building_origin + Vector3(0, 3.2, 0), Vector3(34.0, 6.4, 12.0), Color(0.16, 0.19, 0.24))
+	_add_box(building_origin + Vector3(0, 3.5, -6.2), Vector3(35.0, 6.0, 0.35), Color(0.10, 0.25, 0.34))
+	_add_box(building_origin + Vector3(0, 6.6, 0), Vector3(36.0, 0.55, 13.0), Color(0.035, 0.05, 0.075))
+
+	# Tall circuit floodlight masts add scale; reduced density on Low.
+	var light_step: int = 36 if graphics_quality == 0 else 20
+	for i in range(10, points.size(), light_step):
+		var p: Vector3 = points[i]
+		var tangent := (points[(i + 1) % points.size()] - points[(i - 1 + points.size()) % points.size()]).normalized()
+		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
+		var mast := MeshInstance3D.new()
+		var mast_mesh := CylinderMesh.new()
+		mast_mesh.top_radius = 0.10
+		mast_mesh.bottom_radius = 0.16
+		mast_mesh.height = 11.0
+		mast.mesh = mast_mesh
+		mast.material_override = roof_mat
+		mast.position = p + lateral * 20.0 + Vector3(0, 5.5, 0)
+		add_child(mast)
+		var lamp := MeshInstance3D.new()
+		var lamp_mesh := BoxMesh.new()
+		lamp_mesh.size = Vector3(2.8, 0.22, 0.65)
+		lamp.mesh = lamp_mesh
+		lamp.material_override = seat_mat
+		lamp.position = mast.position + Vector3(0, 5.5, 0)
+		add_child(lamp)
 
 func _barrier_piece(p1: Vector3, p2: Vector3, material: Material) -> void:
-	var barrier := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.55, 1.15, p1.distance_to(p2) + 0.35)
-	barrier.mesh = mesh
-	barrier.material_override = material
-	barrier.position = (p1 + p2) * 0.5 + Vector3(0, 0.58, 0)
-	barrier.rotation.y = atan2(-(p2.x - p1.x), -(p2.z - p1.z))
-	add_child(barrier)
+	var direction := (p2 - p1).normalized()
+	var centre := (p1 + p2) * 0.5
+	var length := p1.distance_to(p2) + 0.25
+	var rail := MeshInstance3D.new()
+	var rail_mesh := BoxMesh.new()
+	rail_mesh.size = Vector3(0.32, 0.42, length)
+	rail.mesh = rail_mesh
+	rail.material_override = material
+	rail.position = centre + Vector3(0, 0.82, 0)
+	rail.rotation.y = atan2(-direction.x, -direction.z)
+	add_child(rail)
+	for offset in [-0.42, 0.42]:
+		var support := MeshInstance3D.new()
+		var support_mesh := BoxMesh.new()
+		support_mesh.size = Vector3(0.42, 0.9, 0.34)
+		support.mesh = support_mesh
+		support.material_override = _mat(Color(0.22, 0.25, 0.29))
+		support.position = centre + direction * offset + Vector3(0, 0.45, 0)
+		add_child(support)
 
 func _add_start_finish_line(points: Array[Vector3], road_material: Material) -> void:
 	if points.size() < 3:
