@@ -42,6 +42,9 @@ var track_points: Array[Vector3] = []
 var selected_team := 0
 var selected_driver := 0
 var selected_track := 0
+var selected_tyre_compound := "MEDIUM"
+var tyre_label: Label
+var systems_label: Label
 var race_started := false
 var countdown_remaining := 3.0
 var race_active := false
@@ -133,6 +136,14 @@ func _build_menu() -> void:
 	track_select.selected = selected_track
 	track_select.item_selected.connect(func(index: int): selected_track = index)
 	column.add_child(track_select)
+	_add_menu_label(column, "TYRE COMPOUND")
+	var tyre_select := OptionButton.new()
+	tyre_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for compound in ["SOFT", "MEDIUM", "HARD"]:
+		tyre_select.add_item(compound)
+	tyre_select.select(1)
+	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
+	column.add_child(tyre_select)
 	var info := Label.new()
 	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  22-car grid"
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -173,6 +184,7 @@ func _start_race() -> void:
 	menu_layer.queue_free()
 	_build_track(selected_track)
 	_build_player()
+	player.tyre_compound = selected_tyre_compound
 	_build_ai()
 	_build_hud()
 	player.controls_enabled = false
@@ -387,6 +399,12 @@ func _build_hud() -> void:
 	var circuit := Label.new()
 	circuit.text = "%s  •  22-car field" % TRACKS[selected_track]
 	column.add_child(circuit)
+	tyre_label = Label.new()
+	tyre_label.add_theme_font_size_override("font_size", 14)
+	column.add_child(tyre_label)
+	systems_label = Label.new()
+	systems_label.add_theme_font_size_override("font_size", 14)
+	column.add_child(systems_label)
 	lap_label = Label.new()
 	lap_label.add_theme_font_size_override("font_size", 16)
 	column.add_child(lap_label)
@@ -398,7 +416,7 @@ func _build_hud() -> void:
 	race_status_label.add_theme_color_override("font_color", Color(0.95, 0.78, 0.24))
 	column.add_child(race_status_label)
 	var controls := Label.new()
-	controls.text = "WASD / Arrow keys to drive  •  3-lap race"
+	controls.text = "WASD drive  •  E ERS boost  •  Q DRS  •  3-lap race"
 	controls.position = Vector2(22, 670)
 	layer.add_child(controls)
 
@@ -420,6 +438,10 @@ func _process(delta: float) -> void:
 	if is_instance_valid(player):
 		speed_label.text = "Speed  %03d km/h\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
+		var current_track_index := max(player_last_track_index, 0)
+		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
+		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
+		systems_label.text = "FUEL  %02d%%  •  ERS  %02d%%  •  DRS  %s" % [int(player.fuel_remaining), int(player.ers_charge), "ON" if player.drs_active else "OFF"]
 		var progress := _player_progress_score()
 		var position := _get_player_position(progress)
 		lap_label.text = "LAP  %d / %d" % [min(player_laps + 1, race_lap_limit), race_lap_limit]
