@@ -16,6 +16,12 @@ var throttle_input := 0.0
 var brake_input := 0.0
 var steer_input := 0.0
 var controls_enabled := true
+var tyre_compound := "MEDIUM"
+var tyre_wear := 100.0
+var fuel_remaining := 100.0
+var ers_charge := 100.0
+var drs_zone := false
+var drs_active := false
 
 func _physics_process(delta: float) -> void:
 	if not controls_enabled:
@@ -25,6 +31,8 @@ func _physics_process(delta: float) -> void:
 	throttle_input = Input.get_action_strength("accelerate")
 	brake_input = Input.get_action_strength("brake")
 	steer_input = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
+	var ers_requested := Input.is_action_pressed("ers_boost") and ers_charge > 0.5
+	drs_active = Input.is_action_pressed("drs") and drs_zone and abs(speed) > 25.0
 
 	var forward := -global_transform.basis.z
 	var side := global_transform.basis.x
@@ -36,7 +44,10 @@ func _physics_process(delta: float) -> void:
 		if forward_speed < -0.5:
 			forward_speed = move_toward(forward_speed, 0.0, braking * delta)
 		else:
-			forward_speed = move_toward(forward_speed, max_speed, acceleration * delta * throttle_input)
+			var fuel_power := 0.55 if fuel_remaining <= 0.0 else lerp(0.72, 1.0, fuel_remaining / 100.0)
+			var ers_power := 8.0 if ers_requested else 0.0
+			var speed_cap := max_speed + (8.0 if drs_active else 0.0) + ers_power
+			forward_speed = move_toward(forward_speed, speed_cap, (acceleration * fuel_power + ers_power * 0.9) * delta * throttle_input)
 	elif brake_input > 0.01:
 		if forward_speed > 0.5:
 			forward_speed = move_toward(forward_speed, 0.0, braking * delta * brake_input)
@@ -46,10 +57,13 @@ func _physics_process(delta: float) -> void:
 		forward_speed = move_toward(forward_speed, 0.0, rolling_resistance * delta)
 
 	# Aerodynamic drag increases with speed. Downforce improves high-speed cornering grip.
-	var drag := aerodynamic_drag * forward_speed * forward_speed
+	var drag_factor := 0.78 if drs_active else 1.0
+	var drag := aerodynamic_drag * drag_factor * forward_speed * forward_speed
 	forward_speed = move_toward(forward_speed, 0.0, drag * delta)
 	var downforce_grip := min(abs(forward_speed) * 0.055, 4.0)
-	var available_grip := lateral_grip + downforce_grip
+	var compound_grip := 1.08 if tyre_compound == "SOFT" else (0.92 if tyre_compound == "HARD" else 1.0)
+	var wear_grip := lerp(0.58, 1.0, tyre_wear / 100.0)
+	var available_grip := (lateral_grip + downforce_grip) * compound_grip * wear_grip
 	side_speed = move_toward(side_speed, 0.0, available_grip * delta)
 
 	# Steering response builds with speed, while very high speed slightly limits yaw rate.
@@ -65,6 +79,15 @@ func _physics_process(delta: float) -> void:
 	velocity.z = forward.z * forward_speed + side.z * side_speed
 	velocity.y = -1.0
 	speed = abs(forward_speed)
+	if throttle_input > 0.05 and fuel_remaining > 0.0:
+		fuel_remaining = max(0.0, fuel_remaining - delta * (0.045 + throttle_input * 0.12))
+	if ers_requested and throttle_input > 0.05:
+		ers_charge = max(0.0, ers_charge - delta * 24.0)
+	elif brake_input > 0.05 or forward_speed < 0.0:
+		ers_charge = min(100.0, ers_charge + delta * 10.0)
+	if abs(forward_speed) > 5.0:
+		var wear_rate := 0.045 if tyre_compound == "SOFT" else (0.022 if tyre_compound == "HARD" else 0.032)
+		tyre_wear = max(0.0, tyre_wear - abs(forward_speed) * delta * wear_rate)
 	move_and_slide()
 
 func apply_collision(impact_direction: Vector3) -> void:
