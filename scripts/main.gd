@@ -38,6 +38,7 @@ var speed_label: Label
 var menu_layer: CanvasLayer
 var elapsed := 0.0
 var track_radius := 52.0
+var track_points: Array[Vector3] = []
 var selected_team := 0
 var selected_driver := 0
 var selected_track := 0
@@ -181,6 +182,7 @@ func _build_track(track_index: int) -> void:
 				var radius_x := 58.0 + 13.0 * sin(3.0 * a) + 5.0 * cos(5.0 * a)
 				var radius_z := 43.0 + 9.0 * cos(2.0 * a)
 				points.append(Vector3(cos(a) * radius_x, 0, sin(a) * radius_z))
+	track_points = points
 	track_radius = 52.0 if track_index == 0 else 57.0
 	var road_mat := _mat(Color(0.105, 0.115, 0.13))
 	var curb_mat := _mat(Color(0.9, 0.12, 0.12))
@@ -244,7 +246,8 @@ func _build_ai() -> void:
 			ai.driver_name = DRIVERS_BY_TEAM[team_index][driver_index]
 			ai.driver_number = DRIVER_NUMBERS_BY_TEAM[team_index][driver_index]
 			ai.lane_offset = -5.0 + float(grid_index % 6) * 1.8
-			ai.phase = 0.35 + float(grid_index) * (TAU / 21.0)
+			ai.phase = float(grid_index) / 21.0
+			ai.track_points = track_points
 			ai.speed_factor = 0.78 + float(grid_index % 7) * 0.035
 			ai.track_radius = track_radius
 			add_child(ai)
@@ -300,7 +303,7 @@ func _build_hud() -> void:
 	speed_label.add_theme_font_size_override("font_size", 20)
 	column.add_child(speed_label)
 	var circuit := Label.new()
-	circuit.text = "%s  •  12-car field" % TRACKS[selected_track]
+	circuit.text = "%s  •  22-car field" % TRACKS[selected_track]
 	column.add_child(circuit)
 	var controls := Label.new()
 	controls.text = "WASD / Arrow keys to drive"
