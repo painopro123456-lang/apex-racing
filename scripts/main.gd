@@ -43,6 +43,15 @@ var selected_team := 0
 var selected_driver := 0
 var selected_track := 0
 var race_started := false
+var countdown_remaining := 3.0
+var race_active := false
+var race_finished := false
+var player_laps := 0
+var player_last_track_index := -1
+var race_lap_limit := 3
+var race_status_label: Label
+var lap_label: Label
+var position_label: Label
 
 func _ready() -> void:
 	_build_environment()
@@ -166,6 +175,10 @@ func _start_race() -> void:
 	_build_player()
 	_build_ai()
 	_build_hud()
+	player.controls_enabled = false
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.set_process(false)
+	race_status_label.text = "GET READY  3"
 
 func _build_track(track_index: int) -> void:
 	var points: Array[Vector3] = []
@@ -374,14 +387,102 @@ func _build_hud() -> void:
 	var circuit := Label.new()
 	circuit.text = "%s  •  22-car field" % TRACKS[selected_track]
 	column.add_child(circuit)
+	lap_label = Label.new()
+	lap_label.add_theme_font_size_override("font_size", 16)
+	column.add_child(lap_label)
+	position_label = Label.new()
+	position_label.add_theme_font_size_override("font_size", 16)
+	column.add_child(position_label)
+	race_status_label = Label.new()
+	race_status_label.add_theme_font_size_override("font_size", 22)
+	race_status_label.add_theme_color_override("font_color", Color(0.95, 0.78, 0.24))
+	column.add_child(race_status_label)
 	var controls := Label.new()
-	controls.text = "WASD / Arrow keys to drive"
+	controls.text = "WASD / Arrow keys to drive  •  3-lap race"
 	controls.position = Vector2(22, 670)
 	layer.add_child(controls)
 
 func _process(delta: float) -> void:
-	if not race_started:
+	if not race_started or race_finished:
+		return
+	if not race_active:
+		countdown_remaining -= delta
+		if countdown_remaining > 0.0:
+			race_status_label.text = "GET READY  %d" % int(ceil(countdown_remaining))
+		else:
+			race_active = true
+			player.controls_enabled = true
+			for opponent in get_tree().get_nodes_in_group("ai_cars"):
+				opponent.set_process(true)
+			race_status_label.text = "LIGHTS OUT  •  GO!"
 		return
 	elapsed += delta
 	if is_instance_valid(player):
-		speed_label.text = "Speed  %03d km/h\nSession  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
+		speed_label.text = "Speed  %03d km/h\\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
+		_update_player_lap()
+		var progress := _player_progress_score()
+		var position := _get_player_position(progress)
+		lap_label.text = "LAP  %d / %d" % [min(player_laps + 1, race_lap_limit), race_lap_limit]
+		position_label.text = "POSITION  %02d / 22" % position
+		if player_laps >= race_lap_limit:
+			_finish_race()
+
+func _nearest_track_index(position: Vector3) -> int:
+	var nearest_index := 0
+	var nearest_distance := INF
+	for i in range(track_points.size()):
+		var distance := position.distance_squared_to(track_points[i])
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_index = i
+	return nearest_index
+
+func _update_player_lap() -> void:
+	if track_points.is_empty():
+		return
+	var current_index := _nearest_track_index(player.global_position)
+	if player_last_track_index >= 0:
+		var count := track_points.size()
+		if player_last_track_index > int(count * 0.8) and current_index < int(count * 0.2):
+			player_laps += 1
+	player_last_track_index = current_index
+
+func _player_progress_score() -> float:
+	return float(player_laps * track_points.size() + max(player_last_track_index, 0))
+
+func _get_player_position(player_progress: float) -> int:
+	var ahead := 0
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		var score := float(opponent.completed_laps * track_points.size() + opponent.progress_index)
+		if score > player_progress:
+			ahead += 1
+	return ahead + 1
+
+func _finish_race() -> void:
+	race_finished = true
+	player.controls_enabled = false
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.set_process(false)
+	race_status_label.text = "FINISHED"
+	var result_layer := CanvasLayer.new()
+	add_child(result_layer)
+	var result_panel := PanelContainer.new()
+	result_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	result_panel.position = Vector2(-210, -100)
+	result_panel.custom_minimum_size = Vector2(420, 200)
+	result_layer.add_child(result_panel)
+	var result_column := VBoxContainer.new()
+	result_panel.add_child(result_column)
+	var heading := Label.new()
+	heading.text = "RACE COMPLETE"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 28)
+	result_column.add_child(heading)
+	var result := Label.new()
+	result.text = "%s finishes P%d\\n3 laps  •  %s\\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], _get_player_position(_player_progress_score()), TRACKS[selected_track], elapsed]
+	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	result_column.add_child(result)
+	var close_button := Button.new()
+	close_button.text = "EXIT GAME"
+	close_button.pressed.connect(func(): get_tree().quit())
+	result_column.add_child(close_button)
