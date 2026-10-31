@@ -185,16 +185,78 @@ func _build_track(track_index: int) -> void:
 	track_points = points
 	track_radius = 52.0 if track_index == 0 else 57.0
 	var road_mat := _mat(Color(0.105, 0.115, 0.13))
-	var curb_mat := _mat(Color(0.9, 0.12, 0.12))
+	var curb_red := _mat(Color(0.88, 0.055, 0.06))
+	var curb_white := _mat(Color(0.88, 0.88, 0.84))
+	var barrier_mat := _mat(Color(0.72, 0.75, 0.78))
 	for i in range(points.size()):
 		var p1: Vector3 = points[i]
 		var p2: Vector3 = points[(i + 1) % points.size()]
 		_road_piece(p1, p2, 15.0, road_mat)
 		var outward1 := p1.normalized()
 		var outward2 := p2.normalized()
-		_road_piece(p1 + outward1 * 8.2, p2 + outward2 * 8.2, 1.0, curb_mat)
-		_road_piece(p1 - outward1 * 8.2, p2 - outward2 * 8.2, 1.0, curb_mat)
+		var curb_material: Material = curb_red if i % 2 == 0 else curb_white
+		_road_piece(p1 + outward1 * 8.2, p2 + outward2 * 8.2, 1.15, curb_material)
+		_road_piece(p1 - outward1 * 8.2, p2 - outward2 * 8.2, 1.15, curb_material)
+		if i % 2 == 0:
+			_barrier_piece(p1 + outward1 * 11.0, p2 + outward2 * 11.0, barrier_mat)
+			_barrier_piece(p1 - outward1 * 11.0, p2 - outward2 * 11.0, barrier_mat)
+	_add_start_finish_line(points, road_mat)
+	_add_pit_lane(points, road_mat)
 	_add_box(Vector3(0, 1, -track_radius - 17), Vector3(38, 2, 8), Color(0.68, 0.73, 0.8))
+
+func _barrier_piece(p1: Vector3, p2: Vector3, material: Material) -> void:
+	var barrier := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.55, 1.15, p1.distance_to(p2) + 0.35)
+	barrier.mesh = mesh
+	barrier.material_override = material
+	barrier.position = (p1 + p2) * 0.5 + Vector3(0, 0.58, 0)
+	barrier.rotation.y = atan2(-(p2.x - p1.x), -(p2.z - p1.z))
+	add_child(barrier)
+
+func _add_start_finish_line(points: Array[Vector3], road_material: Material) -> void:
+	if points.size() < 3:
+		return
+	var p1: Vector3 = points[0]
+	var p2: Vector3 = points[1]
+	var line := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(15.0, 0.025, 0.85)
+	line.mesh = mesh
+	line.material_override = _mat(Color(0.92, 0.92, 0.88))
+	line.position = (p1 + p2) * 0.5 + Vector3(0, 0.105, 0)
+	line.rotation.y = atan2(-(p2.x - p1.x), -(p2.z - p1.z))
+	add_child(line)
+
+func _add_pit_lane(points: Array[Vector3], road_material: Material) -> void:
+	# A lightweight parallel pit lane beside the opening section of each prototype circuit.
+	var lane_points: Array[Vector3] = []
+	var limit := min(18, points.size() - 1)
+	for i in range(limit + 1):
+		var previous: Vector3 = points[(i - 1 + points.size()) % points.size()]
+		var next_point: Vector3 = points[(i + 1) % points.size()]
+		var tangent := (next_point - previous).normalized()
+		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
+		lane_points.append(points[i] + lateral * 20.0)
+	for i in range(lane_points.size() - 1):
+		_road_piece(lane_points[i], lane_points[i + 1], 8.0, road_material)
+		if i % 2 == 0:
+			_road_piece(lane_points[i] + Vector3(0, 0.12, 0), lane_points[i + 1] + Vector3(0, 0.12, 0), 0.16, _mat(Color(0.92, 0.92, 0.88)))
+	for stall in range(8):
+		var index := min(2 + stall * 2, lane_points.size() - 2)
+		var p: Vector3 = lane_points[index]
+		var p_next: Vector3 = lane_points[index + 1]
+		var box := MeshInstance3D.new()
+		var box_mesh := BoxMesh.new()
+		box_mesh.size = Vector3(2.8, 0.035, 4.0)
+		box.mesh = box_mesh
+		box.material_override = _mat(Color(0.78, 0.8, 0.83))
+		box.position = (p + p_next) * 0.5 + Vector3(0, 0.13, 0)
+		box.rotation.y = atan2(-(p_next.x - p.x), -(p_next.z - p.z))
+		add_child(box)
+	if lane_points.size() > 8:
+		var middle: Vector3 = lane_points[8]
+		_add_box(middle + Vector3(0, 2.2, -8), Vector3(20, 4.4, 7), Color(0.28, 0.32, 0.39))
 
 func _rounded_rect_points(width: float, depth: float, radius: float, count: int) -> Array[Vector3]:
 	var pts: Array[Vector3] = []
