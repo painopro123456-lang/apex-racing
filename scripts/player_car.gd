@@ -16,6 +16,7 @@ var aero_level := 60.0
 var front_wing := 60.0
 var rear_wing := 60.0
 var damage := 0.0
+var collision_count := 0
 
 var throttle_input := 0.0
 var brake_input := 0.0
@@ -110,6 +111,7 @@ func _brake_effectiveness() -> float:
 func apply_collision(impact_direction: Vector3) -> void:
 	# Collision damage reduces power and grip until repaired in the pits.
 	damage = min(100.0, damage + 12.0)
+	collision_count += 1
 	var impact := impact_direction.normalized()
 	velocity.x += impact.x * 9.0
 	velocity.z += impact.z * 9.0
