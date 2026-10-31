@@ -264,6 +264,12 @@ func _build_menu() -> void:
 	race_title.add_theme_font_size_override("font_size", 27)
 	race_page.add_child(race_title)
 	_add_menu_label(race_page, "CIRCUIT")
+	_add_menu_label(race_page, "DRIVER")
+	var race_driver_select := OptionButton.new()
+	race_driver_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_populate_driver_select(race_driver_select)
+	race_driver_select.item_selected.connect(func(index: int): selected_driver = index)
+	race_page.add_child(race_driver_select)
 	var track_select := OptionButton.new()
 	track_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for track in TRACKS:
@@ -316,6 +322,7 @@ func _build_menu() -> void:
 		selected_team = index
 		selected_driver = 0
 		_populate_driver_select(driver_select)
+		_populate_driver_select(race_driver_select)
 	)
 	driver_select.item_selected.connect(func(index: int): selected_driver = index)
 	_add_menu_label(garage, "CAR GENERATION")
