@@ -44,6 +44,30 @@ func _ready() -> void:
 	add_child(collision_area)
 	collision_area.body_entered.connect(_on_body_entered)
 
+func reset_to_grid(grid_position: int) -> void:
+	if track_points.size() < 3:
+		return
+	if grid_position <= 1:
+		phase = 0.0
+		progress_index = 0
+		completed_laps = 0
+		lane_offset = -2.1
+	else:
+		var row := int((grid_position - 2) / 2) + 1
+		phase = fposmod(1.0 - float(row * 4) / float(track_points.size()), 1.0)
+		progress_index = int(phase * track_points.size()) % track_points.size()
+		completed_laps = -1
+		lane_offset = -2.1 if grid_position % 2 == 0 else 2.1
+	base_lane = lane_offset
+	global_position = _lane_point(progress_index, base_lane)
+	var previous: Vector3 = track_points[(progress_index - 1 + track_points.size()) % track_points.size()]
+	var next_point: Vector3 = track_points[(progress_index + 1) % track_points.size()]
+	var tangent := (next_point - previous).normalized()
+	rotation.y = atan2(-tangent.x, -tangent.z)
+	current_speed = 0.0
+	overtake_offset = 0.0
+	overtake_timer = 0.0
+
 func _process(delta: float) -> void:
 	if track_points.size() < 4:
 		return
