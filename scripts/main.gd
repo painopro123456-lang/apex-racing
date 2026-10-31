@@ -665,33 +665,49 @@ func _add_track_ribbon(points: Array[Vector3], inner_offset: float, outer_offset
 	add_child(node)
 
 func _named_circuit_points(track_index: int, count: int) -> Array[Vector3]:
-	# Distinct fictionalised centreline layouts inspired by the character of each venue.
-	# These are original approximations, not surveyed or exact licensed circuit maps.
-	var shapes := [
-		[60.0, 43.0, 0.10, 0.08, 0.035, 0.02],
-		[67.0, 40.0, 0.16, 0.045, 0.025, 0.06],
-		[64.0, 46.0, 0.07, 0.14, 0.045, 0.035],
-		[62.0, 39.0, 0.19, 0.12, 0.035, 0.075],
-		[70.0, 42.0, 0.13, 0.055, 0.07, 0.025],
-		[66.0, 38.0, 0.08, 0.035, 0.10, 0.045],
-		[72.0, 45.0, 0.14, 0.09, 0.055, 0.08],
-		[61.0, 44.0, 0.055, 0.15, 0.08, 0.025],
-		[68.0, 41.0, 0.12, 0.07, 0.03, 0.095],
-		[63.0, 42.0, 0.17, 0.045, 0.075, 0.055],
-		[69.0, 39.0, 0.09, 0.11, 0.04, 0.10],
-		[65.0, 46.0, 0.045, 0.16, 0.065, 0.04]
+	# Hand-authored centreline silhouettes for each named venue. These are
+	# playable approximations, not surveyed/licensed centimetre-accurate maps.
+	var layouts: Array = [
+		# Monaco: tight harbour streets, slow hairpin and short straights.
+		[Vector2(-0.92, -0.22), Vector2(-0.72, -0.68), Vector2(-0.22, -0.78), Vector2(0.22, -0.70), Vector2(0.66, -0.48), Vector2(0.84, -0.12), Vector2(0.60, 0.10), Vector2(0.30, 0.12), Vector2(0.26, 0.42), Vector2(0.66, 0.66), Vector2(0.18, 0.78), Vector2(-0.58, 0.55), Vector2(-0.88, 0.20)],
+		# Silverstone: fast flowing loop with linked direction changes.
+		[Vector2(-0.92, -0.12), Vector2(-0.70, -0.58), Vector2(-0.30, -0.72), Vector2(0.02, -0.55), Vector2(0.45, -0.70), Vector2(0.86, -0.40), Vector2(0.72, -0.02), Vector2(0.94, 0.34), Vector2(0.58, 0.72), Vector2(0.10, 0.55), Vector2(-0.18, 0.78), Vector2(-0.58, 0.52), Vector2(-0.82, 0.22)],
+		# Monza: long straights and tight chicanes.
+		[Vector2(-0.86, -0.66), Vector2(-0.25, -0.72), Vector2(0.66, -0.72), Vector2(0.88, -0.50), Vector2(0.52, -0.34), Vector2(0.80, -0.12), Vector2(0.84, 0.56), Vector2(0.58, 0.74), Vector2(-0.58, 0.74), Vector2(-0.86, 0.52), Vector2(-0.56, 0.30), Vector2(-0.84, 0.08), Vector2(-0.90, -0.36)],
+		# Spa: long sweeping bends and a fast climbing section.
+		[Vector2(-0.88, 0.42), Vector2(-0.72, -0.22), Vector2(-0.48, -0.68), Vector2(-0.08, -0.80), Vector2(0.28, -0.62), Vector2(0.62, -0.76), Vector2(0.90, -0.40), Vector2(0.78, 0.04), Vector2(0.46, 0.30), Vector2(0.64, 0.62), Vector2(0.22, 0.78), Vector2(-0.30, 0.62), Vector2(-0.64, 0.78), Vector2(-0.88, 0.42)],
+		# Suzuka: compact technical sequence with a crossover-like central kink.
+		[Vector2(-0.92, -0.30), Vector2(-0.62, -0.68), Vector2(-0.18, -0.74), Vector2(0.22, -0.50), Vector2(0.62, -0.62), Vector2(0.88, -0.26), Vector2(0.54, 0.02), Vector2(0.12, -0.10), Vector2(-0.20, 0.20), Vector2(0.16, 0.50), Vector2(0.62, 0.72), Vector2(0.20, 0.78), Vector2(-0.42, 0.60), Vector2(-0.84, 0.24)],
+		# Bahrain: heavy braking corners linked by straights.
+		[Vector2(-0.90, -0.60), Vector2(-0.25, -0.68), Vector2(0.54, -0.72), Vector2(0.88, -0.42), Vector2(0.56, -0.18), Vector2(0.88, 0.12), Vector2(0.62, 0.42), Vector2(0.82, 0.68), Vector2(0.20, 0.76), Vector2(-0.28, 0.62), Vector2(-0.72, 0.72), Vector2(-0.88, 0.38), Vector2(-0.58, 0.10), Vector2(-0.88, -0.12)],
+		# Singapore: narrow street circuit with repeated 90-degree turns.
+		[Vector2(-0.86, -0.70), Vector2(-0.12, -0.70), Vector2(0.02, -0.50), Vector2(0.72, -0.50), Vector2(0.86, -0.26), Vector2(0.58, -0.04), Vector2(0.86, 0.18), Vector2(0.72, 0.68), Vector2(0.10, 0.70), Vector2(-0.08, 0.48), Vector2(-0.70, 0.48), Vector2(-0.86, 0.22), Vector2(-0.58, -0.02), Vector2(-0.86, -0.24)],
+		# Albert Park: flowing parkland circuit with a long outer sweep.
+		[Vector2(-0.86, -0.46), Vector2(-0.48, -0.72), Vector2(0.12, -0.70), Vector2(0.62, -0.52), Vector2(0.88, -0.18), Vector2(0.68, 0.14), Vector2(0.88, 0.48), Vector2(0.52, 0.72), Vector2(-0.12, 0.68), Vector2(-0.58, 0.48), Vector2(-0.86, 0.12), Vector2(-0.62, -0.10)],
+		# Interlagos: short, undulating, anti-clockwise-style loop.
+		[Vector2(-0.84, -0.52), Vector2(-0.30, -0.72), Vector2(0.26, -0.68), Vector2(0.76, -0.42), Vector2(0.88, -0.02), Vector2(0.56, 0.18), Vector2(0.82, 0.50), Vector2(0.48, 0.74), Vector2(-0.10, 0.62), Vector2(-0.50, 0.78), Vector2(-0.84, 0.48), Vector2(-0.58, 0.16), Vector2(-0.88, -0.10)],
+		# Zandvoort: flowing dunes and tight banked-style turns.
+		[Vector2(-0.88, -0.48), Vector2(-0.58, -0.76), Vector2(-0.08, -0.66), Vector2(0.40, -0.78), Vector2(0.82, -0.50), Vector2(0.70, -0.12), Vector2(0.90, 0.22), Vector2(0.58, 0.62), Vector2(0.08, 0.72), Vector2(-0.38, 0.54), Vector2(-0.82, 0.68), Vector2(-0.68, 0.20), Vector2(-0.90, -0.10)],
+		# Imola: narrow, fast, technical bends.
+		[Vector2(-0.90, -0.42), Vector2(-0.56, -0.72), Vector2(-0.12, -0.62), Vector2(0.32, -0.78), Vector2(0.78, -0.52), Vector2(0.86, -0.12), Vector2(0.56, 0.12), Vector2(0.80, 0.48), Vector2(0.38, 0.72), Vector2(-0.10, 0.60), Vector2(-0.48, 0.78), Vector2(-0.86, 0.46), Vector2(-0.62, 0.08)],
+		# Portimao: flowing roller-coaster sequence with alternating radius corners.
+		[Vector2(-0.90, -0.34), Vector2(-0.66, -0.72), Vector2(-0.18, -0.78), Vector2(0.28, -0.56), Vector2(0.76, -0.72), Vector2(0.90, -0.28), Vector2(0.62, 0.02), Vector2(0.86, 0.38), Vector2(0.50, 0.72), Vector2(0.02, 0.58), Vector2(-0.30, 0.78), Vector2(-0.78, 0.54), Vector2(-0.90, 0.10)]
 	]
-	var shape: Array = shapes[clampi(track_index - 3, 0, shapes.size() - 1)]
+	var control: Array = layouts[clampi(track_index - 3, 0, layouts.size() - 1)]
 	var points: Array[Vector3] = []
-	var rx: float = shape[0]
-	var rz: float = shape[1]
+	var segment_count := control.size()
 	for i in range(count):
-		var a := TAU * float(i) / float(count)
-		var x := rx * cos(a)
-		var z := rz * sin(a)
-		x += rx * (float(shape[2]) * sin(2.0 * a + 0.25) + float(shape[3]) * cos(3.0 * a - 0.4) + float(shape[4]) * sin(5.0 * a))
-		z += rz * (float(shape[3]) * sin(2.0 * a + 0.6) + float(shape[4]) * cos(3.0 * a) + float(shape[5]) * sin(4.0 * a - 0.3))
-		points.append(Vector3(x, 0.0, z))
+		var scaled := float(i) / float(count) * float(segment_count)
+		var segment := int(floor(scaled)) % segment_count
+		var t := scaled - floor(scaled)
+		var p0: Vector2 = control[(segment - 1 + segment_count) % segment_count]
+		var p1: Vector2 = control[segment]
+		var p2: Vector2 = control[(segment + 1) % segment_count]
+		var p3: Vector2 = control[(segment + 2) % segment_count]
+		var t2 := t * t
+		var t3 := t2 * t
+		var point := 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+		points.append(Vector3(point.x * 72.0, 0.0, point.y * 51.0))
 	return points
 
 func _add_trackside_scenery(points: Array[Vector3]) -> void:
