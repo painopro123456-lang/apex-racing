@@ -16,6 +16,8 @@ var target_speed := 34.0
 var base_lane := 0.0
 var overtake_offset := 0.0
 var overtake_timer := 0.0
+var formation_mode := false
+var caution_mode := false
 
 const LOOKAHEAD_POINTS := 7
 const TRACK_HALF_WIDTH := 7.5
@@ -91,6 +93,10 @@ func _process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, desired_yaw, clamp(delta * 3.8, 0.0, 1.0))
 
 	var speed_multiplier := speed_factor
+	if formation_mode:
+		speed_multiplier = min(speed_multiplier, 0.48)
+	if caution_mode:
+		speed_multiplier = min(speed_multiplier, 0.62)
 	if avoid != 0.0:
 		speed_multiplier = max(0.62, speed_multiplier - 0.08)
 	current_speed = move_toward(current_speed, target_speed * speed_multiplier, 12.0 * delta)
