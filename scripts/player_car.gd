@@ -15,8 +15,13 @@ var aerodynamic_drag := 0.0022
 var throttle_input := 0.0
 var brake_input := 0.0
 var steer_input := 0.0
+var controls_enabled := true
 
 func _physics_process(delta: float) -> void:
+	if not controls_enabled:
+		velocity = Vector3.ZERO
+		speed = 0.0
+		return
 	throttle_input = Input.get_action_strength("accelerate")
 	brake_input = Input.get_action_strength("brake")
 	steer_input = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
