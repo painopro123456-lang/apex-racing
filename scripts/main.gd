@@ -86,6 +86,9 @@ var last_seen_collision_count := 0
 var is_dnf := false
 var dnf_reason := ""
 var race_control_label: Label
+var race_flag_label: Label
+var yellow_flag_timer := 0.0
+var formation_ai_times: Array[Dictionary] = []
 var qualifying_best_lap := INF
 var qualifying_lap_invalid := false
 var qualifying_lap_start_time := 0.0
@@ -1095,6 +1098,9 @@ func _build_hud() -> void:
 	engineer_col.add_child(gap_label)
 	race_control_label = _hud_label("RACE CONTROL  •  PENALTIES 0.0s", 10, Color(0.98, 0.78, 0.25))
 	engineer_col.add_child(race_control_label)
+	race_flag_label = _hud_label("GREEN FLAG", 13, Color(0.25, 0.95, 0.52))
+	race_flag_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	engineer_col.add_child(race_flag_label)
 	engineer_label = _hud_label(engineer_message, 12, Color(0.9, 0.93, 0.97))
 	engineer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	engineer_col.add_child(engineer_label)
@@ -1145,19 +1151,26 @@ func _process(delta: float) -> void:
 		return
 	if Input.is_action_just_pressed("pit_request") and race_active:
 		_open_pit_strategy("Your request")
+	if yellow_flag_timer > 0.0:
+		yellow_flag_timer = max(0.0, yellow_flag_timer - delta)
+		if yellow_flag_timer <= 0.0:
+			_clear_yellow_flag()
+		if yellow_flag_timer <= 0.0 and is_instance_valid(race_flag_label):
+			race_flag_label.text = "GREEN FLAG"
+			race_flag_label.add_theme_color_override("font_color", Color(0.25, 0.95, 0.52))
 	if race_phase == "QUALIFYING_RESULTS":
 		return
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
-			var countdown_text := "QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining)))
+			var countdown_text := "QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining))))
 			race_status_label.text = countdown_text
 		else:
 			race_active = true
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
-			race_status_label.text = "QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!")
+			race_status_label.text = "QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"))
 		return
 	elapsed += delta
 	if is_instance_valid(player):
@@ -1190,6 +1203,8 @@ func _process(delta: float) -> void:
 		_update_engineer(delta)
 		if race_phase == "QUALIFYING" and player_laps >= 2:
 			_finish_qualifying()
+		elif race_phase == "FORMATION" and player_laps >= 1:
+			_complete_formation_lap()
 		elif race_phase == "RACE" and player_laps >= race_lap_limit:
 			_finish_race()
 
@@ -1270,6 +1285,8 @@ func _update_player_lap() -> void:
 		var count := track_points.size()
 		if player_last_track_index > int(count * 0.8) and current_index < int(count * 0.2):
 			player_laps += 1
+			if race_phase == "FORMATION":
+				return
 			if race_phase == "QUALIFYING":
 				var lap_time := elapsed - qualifying_lap_start_time
 				if lap_time > 0.1 and not qualifying_lap_invalid:
@@ -1302,11 +1319,15 @@ func _update_track_limits(delta: float) -> void:
 		track_limit_timer += delta
 		if track_limit_timer >= 0.8 and not track_limit_outside:
 			track_limit_outside = true
-			if race_phase == "QUALIFYING":
+			if race_phase == "FORMATION":
+				engineer_message = "Stay on the circuit during the formation lap."
+				_trigger_yellow_flag("Car off track")
+			elif race_phase == "QUALIFYING":
 				qualifying_lap_invalid = true
 				engineer_message = "Track limits. LAP DELETED. Stay within the white lines."
 			else:
 				track_limit_count += 1
+				_trigger_yellow_flag("Track limits")
 				if track_limit_count >= 3 and (track_limit_count - 3) % 2 == 0:
 					_issue_time_penalty("Repeated track-limit violations", 5.0)
 				else:
@@ -1317,10 +1338,27 @@ func _update_track_limits(delta: float) -> void:
 		track_limit_timer = 0.0
 		track_limit_outside = false
 
+func _trigger_yellow_flag(reason: String) -> void:
+	yellow_flag_timer = 6.0
+	if is_instance_valid(race_flag_label):
+		race_flag_label.text = "YELLOW FLAG  •  %s" % reason.to_upper()
+		race_flag_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.18))
+	engineer_message = "Yellow flag. Slow down, no overtaking, and be ready for the green."
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.caution_mode = true
+
+func _clear_yellow_flag() -> void:
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.caution_mode = false
+
 func _update_collision_penalties() -> void:
 	var current_collisions := int(player.collision_count)
 	while last_seen_collision_count < current_collisions:
 		last_seen_collision_count += 1
+		if race_phase == "RACE":
+			_trigger_yellow_flag("Incident")
 		if last_seen_collision_count >= 3 and last_seen_collision_count % 2 == 1:
 			_issue_time_penalty("Repeated avoidable contact", 5.0)
 
@@ -1335,6 +1373,9 @@ func _retire_player(reason: String) -> void:
 		return
 	is_dnf = true
 	dnf_reason = reason
+	if is_instance_valid(race_flag_label):
+		race_flag_label.text = "RED FLAG  •  SESSION STOPPED"
+		race_flag_label.add_theme_color_override("font_color", Color(1.0, 0.18, 0.2))
 	race_phase = "DNF"
 	engineer_message = "BOX BOX. Car retired: %s." % reason
 	if is_instance_valid(engineer_label):
@@ -1423,15 +1464,45 @@ func _finish_qualifying() -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(note)
 	var start_button := Button.new()
-	start_button.text = "START GRAND PRIX"
+	start_button.text = "START FORMATION LAP"
 	start_button.custom_minimum_size = Vector2(0, 46)
 	start_button.pressed.connect(func():
 		result_layer.queue_free()
-		_begin_main_race(ai_times)
+		_begin_formation_lap(ai_times)
 	)
 	column.add_child(start_button)
 	engineer_message = "Good job. P%d on the grid. Confirm your race tyres, then we go." % qualifying_grid_position
 	engineer_label.text = engineer_message
+
+func _begin_formation_lap(ai_times: Array[Dictionary]) -> void:
+	race_phase = "FORMATION"
+	formation_ai_times = ai_times.duplicate()
+	elapsed = 0.0
+	player_laps = 0
+	player_last_track_index = _nearest_track_index(player.global_position)
+	countdown_remaining = 3.0
+	race_active = false
+	player.max_speed = 30.0
+	player.controls_enabled = false
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.formation_mode = true
+		opponent.set_process(false)
+	engineer_message = "Formation lap. Keep position, weave gently to warm the tyres, and do not overtake."
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+	race_status_label.text = "FORMATION LAP  •  GET READY"
+	if is_instance_valid(race_flag_label):
+		race_flag_label.text = "FORMATION LAP"
+		race_flag_label.add_theme_color_override("font_color", Color(0.35, 0.82, 1.0))
+
+func _complete_formation_lap() -> void:
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.formation_mode = false
+	player.max_speed = 88.0
+	engineer_message = "Formation lap complete. Return to your grid slot. Stand by for lights."
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+	_begin_main_race(formation_ai_times)
 
 func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	race_phase = "RACE"
