@@ -74,21 +74,28 @@ func _build_environment() -> void:
 	var env_node := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.38, 0.58, 0.75)
+	env.background_color = Color(0.32, 0.49, 0.67)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.8, 0.84, 0.9)
-	env.ambient_light_energy = 0.8
+	env.ambient_light_energy = 0.95
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.05
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.55, 0.66, 0.76)
+	env.fog_density = 0.0018
 	env_node.environment = env
 	add_child(env_node)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-52, -28, 0)
 	sun.shadow_enabled = true
+	sun.light_energy = 1.25
+	sun.directional_shadow_max_distance = 180.0
 	add_child(sun)
 	var ground := MeshInstance3D.new()
 	var ground_mesh := PlaneMesh.new()
 	ground_mesh.size = Vector2(300, 300)
 	ground.mesh = ground_mesh
-	ground.material_override = _mat(Color(0.12, 0.27, 0.16))
+	ground.material_override = _mat(Color(0.10, 0.24, 0.13))
 	ground.position.y = -0.2
 	add_child(ground)
 
@@ -236,8 +243,61 @@ func _build_track(track_index: int) -> void:
 			_barrier_piece(p1 + outward1 * 11.0, p2 + outward2 * 11.0, barrier_mat)
 			_barrier_piece(p1 - outward1 * 11.0, p2 - outward2 * 11.0, barrier_mat)
 	_add_start_finish_line(points, road_mat)
+	_add_trackside_scenery(points)
 	_add_pit_lane(points, road_mat)
 	_add_box(Vector3(0, 1, -track_radius - 17), Vector3(38, 2, 8), Color(0.68, 0.73, 0.8))
+
+func _add_trackside_scenery(points: Array[Vector3]) -> void:
+	# Sparse, low-poly trackside dressing keeps the circuit readable on integrated GPUs.
+	var trunk_mat := _mat(Color(0.22, 0.14, 0.08))
+	var foliage_mat := _mat(Color(0.10, 0.29, 0.16))
+	var stand_mat := _mat(Color(0.20, 0.23, 0.29))
+	var seat_mat := _mat(Color(0.78, 0.80, 0.84))
+	for i in range(5, points.size(), 12):
+		var p: Vector3 = points[i]
+		var outward := Vector3(p.x, 0.0, p.z).normalized()
+		for side in [-1.0, 1.0]:
+			var location := p + outward * side * 20.0
+			var trunk := MeshInstance3D.new()
+			var trunk_mesh := CylinderMesh.new()
+			trunk_mesh.top_radius = 0.22
+			trunk_mesh.bottom_radius = 0.32
+			trunk_mesh.height = 2.2
+			trunk.mesh = trunk_mesh
+			trunk.material_override = trunk_mat
+			trunk.position = location + Vector3(0, 1.1, 0)
+			add_child(trunk)
+			var crown := MeshInstance3D.new()
+			var crown_mesh := SphereMesh.new()
+			crown_mesh.radius = 1.35
+			crown_mesh.height = 2.7
+			crown.mesh = crown_mesh
+			crown.material_override = foliage_mat
+			crown.position = location + Vector3(0, 2.9, 0)
+			add_child(crown)
+	# A compact grandstand gives the start/finish area a stronger race-event feel.
+	if points.size() > 24:
+		var centre: Vector3 = points[12]
+		var tangent := (points[13] - points[11]).normalized()
+		var lateral := Vector3(-tangent.z, 0.0, tangent.x)
+		var stand_origin := centre + lateral * 25.0
+		for tier in range(4):
+			var tier_box := MeshInstance3D.new()
+			var tier_mesh := BoxMesh.new()
+			tier_mesh.size = Vector3(17.0 - float(tier) * 1.8, 0.65, 2.0)
+			tier_box.mesh = tier_mesh
+			tier_box.material_override = stand_mat
+			tier_box.position = stand_origin + Vector3(0, 1.0 + float(tier) * 0.72, -float(tier) * 1.4)
+			tier_box.rotation.y = atan2(-tangent.x, -tangent.z)
+			add_child(tier_box)
+			var seat_strip := MeshInstance3D.new()
+			var seat_mesh := BoxMesh.new()
+			seat_mesh.size = Vector3(16.0 - float(tier) * 1.8, 0.12, 0.18)
+			seat_strip.mesh = seat_mesh
+			seat_strip.material_override = seat_mat
+			seat_strip.position = tier_box.position + Vector3(0, 0.38, 0.72)
+			seat_strip.rotation.y = tier_box.rotation.y
+			add_child(seat_strip)
 
 func _barrier_piece(p1: Vector3, p2: Vector3, material: Material) -> void:
 	var barrier := MeshInstance3D.new()
@@ -422,6 +482,7 @@ func _add_box(pos: Vector3, size: Vector3, color: Color) -> void:
 func _mat(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
+	material.roughness = 0.82
 	return material
 
 func _build_hud() -> void:
