@@ -1346,12 +1346,14 @@ func _trigger_yellow_flag(reason: String) -> void:
 		engineer_label.text = engineer_message
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.caution_mode = true
+	if is_instance_valid(player):
+		player.max_speed = min(player.max_speed, 55.0)
 
 func _clear_yellow_flag() -> void:
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.caution_mode = false
 	if is_instance_valid(player):
-		player.max_speed = 88.0
+		player.max_speed = 30.0 if race_phase == "FORMATION" else 88.0
 
 func _update_collision_penalties() -> void:
 	var current_collisions := int(player.collision_count)
