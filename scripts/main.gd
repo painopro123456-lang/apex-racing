@@ -293,9 +293,9 @@ func _show_loading_overlay() -> Control:
 
 func _build_menu() -> void:
 	menu_layer = CanvasLayer.new()
-	menu_layer.theme = _create_menu_theme()
 	add_child(menu_layer)
 	var backdrop := ColorRect.new()
+	backdrop.theme = _create_menu_theme()
 	backdrop.color = Color(0.025, 0.031, 0.043, 0.99)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_layer.add_child(backdrop)
