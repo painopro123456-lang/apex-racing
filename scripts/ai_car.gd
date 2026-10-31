@@ -95,7 +95,8 @@ func _find_nearby_opponent() -> float:
 	var chosen_offset := 0.0
 	var nearest_distance := 9.0
 	var forward := -global_transform.basis.z
-	for other in get_tree().get_nodes_in_group("ai_cars"):
+	var nearby_cars := get_tree().get_nodes_in_group("ai_cars") + get_tree().get_nodes_in_group("player_car")
+	for other in nearby_cars:
 		if other == self or not is_instance_valid(other):
 			continue
 		var offset: Vector3 = other.global_position - global_position
