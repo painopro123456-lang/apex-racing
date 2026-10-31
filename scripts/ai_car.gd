@@ -117,7 +117,7 @@ func _process(delta: float) -> void:
 	next_index = (segment_index + 1) % count
 	segment_start = _lane_point(segment_index, desired_lane)
 	segment_end = _lane_point(next_index, desired_lane)
-	var blend := clamp(progress_cursor - floor(progress_cursor), 0.0, 1.0)
+	var blend: float = clamp(progress_cursor - floor(progress_cursor), 0.0, 1.0)
 	global_position = segment_start.lerp(segment_end, blend)
 	var tangent: Vector3 = (segment_end - segment_start).normalized()
 	if tangent.length_squared() > 0.001:
