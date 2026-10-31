@@ -55,6 +55,12 @@ var selected_track := 0
 var selected_car_era := 0
 var ai_difficulty := 2
 var race_mode := "RACE"
+var championship_round := 0
+var championship_rounds := 5
+var championship_base_track := 0
+var championship_standings: Dictionary = {}
+const CHAMPIONSHIP_POINTS := [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+const CHAMPIONSHIP_SAVE_PATH := "user://apex_championship.cfg"
 var selected_tyre_compound := "MEDIUM"
 var tyre_label: Label
 var systems_label: Label
@@ -80,6 +86,7 @@ var world_environment: WorldEnvironment
 var sun_light: DirectionalLight3D
 
 func _ready() -> void:
+	_load_championship()
 	_build_environment()
 	_build_menu()
 
@@ -257,6 +264,11 @@ func _build_menu() -> void:
 	practice_button.custom_minimum_size = Vector2(0, 42)
 	practice_button.pressed.connect(_start_race.bind("PRACTICE"))
 	hero_content.add_child(practice_button)
+	var championship_button := Button.new()
+	championship_button.text = "CHAMPIONSHIP  —  5 ROUND SEASON"
+	championship_button.custom_minimum_size = Vector2(0, 46)
+	championship_button.pressed.connect(_start_championship)
+	hero_content.add_child(championship_button)
 	var footer := Label.new()
 	footer.text = "11 TEAMS     22 DRIVERS     %d CIRCUITS     4 CAR GENERATIONS" % TRACKS.size()
 	footer.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
@@ -305,6 +317,11 @@ func _build_menu() -> void:
 	practice_start.custom_minimum_size = Vector2(0, 46)
 	practice_start.pressed.connect(_start_race.bind("PRACTICE"))
 	race_page.add_child(practice_start)
+	var championship_start := Button.new()
+	championship_start.text = "START 5-ROUND CHAMPIONSHIP"
+	championship_start.custom_minimum_size = Vector2(0, 46)
+	championship_start.pressed.connect(_start_championship)
+	race_page.add_child(championship_start)
 	var back_race := Button.new()
 	back_race.text = "BACK TO HOME"
 	back_race.pressed.connect(func(): _set_menu_page(pages, "HOME"))
@@ -427,7 +444,9 @@ func _start_race(mode: String = "RACE") -> void:
 	if race_started:
 		return
 	race_mode = mode
-	race_lap_limit = 5 if race_mode == "PRACTICE" else 3
+	if race_mode == "CHAMPIONSHIP":
+		selected_track = (championship_base_track + championship_round) % TRACKS.size()
+	race_lap_limit = 5 if race_mode == "PRACTICE" or race_mode == "CHAMPIONSHIP" else 3
 	race_started = true
 	_apply_graphics_quality()
 	menu_layer.queue_free()
@@ -439,7 +458,7 @@ func _start_race(mode: String = "RACE") -> void:
 	player.controls_enabled = false
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.set_process(false)
-	race_status_label.text = "PRACTICE  •  GET READY  3" if race_mode == "PRACTICE" else "GET READY  3"
+	race_status_label.text = ("CHAMPIONSHIP  •  ROUND %d/%d  •  GET READY" % [championship_round + 1, championship_rounds]) if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  GET READY  3" if race_mode == "PRACTICE" else "GET READY  3")
 
 func _build_track(track_index: int) -> void:
 	var points: Array[Vector3] = []
@@ -1146,25 +1165,117 @@ func _finish_race() -> void:
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.set_process(false)
 	race_status_label.text = "FINISHED"
+	var player_position := _get_player_position(_player_progress_score())
+	var points_earned := 0
+	var total_points := 0
+	if race_mode == "CHAMPIONSHIP":
+		points_earned = _award_championship_points()
+		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))
 	var result_layer := CanvasLayer.new()
 	add_child(result_layer)
 	var result_panel := PanelContainer.new()
 	result_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	result_panel.position = Vector2(-210, -100)
-	result_panel.custom_minimum_size = Vector2(420, 200)
+	result_panel.position = Vector2(-260, -165)
+	result_panel.custom_minimum_size = Vector2(520, 330)
 	result_layer.add_child(result_panel)
 	var result_column := VBoxContainer.new()
 	result_panel.add_child(result_column)
 	var heading := Label.new()
-	heading.text = "RACE COMPLETE"
+	heading.text = ("CHAMPIONSHIP  •  ROUND %d COMPLETE" % (championship_round + 1)) if race_mode == "CHAMPIONSHIP" else ("PRACTICE COMPLETE" if race_mode == "PRACTICE" else "RACE COMPLETE")
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", 28)
+	heading.add_theme_font_size_override("font_size", 25)
 	result_column.add_child(heading)
 	var result := Label.new()
-	result.text = "%s finishes P%d\n3 laps  •  %s\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], _get_player_position(_player_progress_score()), TRACKS[selected_track], elapsed]
+	if race_mode == "CHAMPIONSHIP":
+		result.text = "%s finishes P%d\n%s\n+%d points  •  Season total: %d\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, TRACKS[selected_track], points_earned, total_points, elapsed]
+	else:
+		result.text = "%s finishes P%d\n%d laps  •  %s\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, race_lap_limit, TRACKS[selected_track], elapsed]
 	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_column.add_child(result)
-	var close_button := Button.new()
-	close_button.text = "EXIT GAME"
-	close_button.pressed.connect(func(): get_tree().quit())
-	result_column.add_child(close_button)
+	if race_mode == "CHAMPIONSHIP":
+		var table_title := Label.new()
+		table_title.text = "DRIVER CHAMPIONSHIP STANDINGS"
+		table_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		result_column.add_child(table_title)
+		var standings_label := Label.new()
+		standings_label.text = _championship_standings_text()
+		standings_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		result_column.add_child(standings_label)
+		var season_button := Button.new()
+		season_button.custom_minimum_size = Vector2(0, 42)
+		if championship_round + 1 < championship_rounds:
+			season_button.text = "NEXT ROUND  →"
+			season_button.pressed.connect(_advance_championship)
+		else:
+			season_button.text = "FINISH CHAMPIONSHIP"
+			season_button.pressed.connect(_complete_championship)
+		result_column.add_child(season_button)
+	else:
+		var close_button := Button.new()
+		close_button.text = "EXIT GAME"
+		close_button.pressed.connect(func(): get_tree().quit())
+		result_column.add_child(close_button)
+
+func _start_championship() -> void:
+	championship_round = 0
+	championship_base_track = selected_track
+	championship_standings.clear()
+	_save_championship()
+	_start_race("CHAMPIONSHIP")
+
+func _advance_championship() -> void:
+	championship_round += 1
+	_save_championship()
+	get_tree().reload_current_scene()
+
+func _complete_championship() -> void:
+	championship_round = 0
+	championship_standings.clear()
+	_save_championship()
+	get_tree().reload_current_scene()
+
+func _award_championship_points() -> int:
+	var entries: Array[Dictionary] = []
+	var player_name: String = DRIVERS_BY_TEAM[selected_team][selected_driver]
+	entries.append({"name": player_name, "progress": _player_progress_score()})
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		entries.append({"name": opponent.driver_name, "progress": float(opponent.completed_laps * track_points.size() + opponent.progress_index)})
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["progress"]) > float(b["progress"])
+	)
+	var earned := 0
+	for i in range(min(entries.size(), CHAMPIONSHIP_POINTS.size())):
+		var driver_name: String = str(entries[i]["name"])
+		var award: int = CHAMPIONSHIP_POINTS[i]
+		championship_standings[driver_name] = int(championship_standings.get(driver_name, 0)) + award
+		if driver_name == player_name:
+			earned = award
+	_save_championship()
+	return earned
+
+func _championship_standings_text() -> String:
+	var rows: Array[Dictionary] = []
+	for driver_name in championship_standings:
+		rows.append({"name": driver_name, "points": int(championship_standings[driver_name])})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["points"]) > int(b["points"])
+	)
+	var lines := PackedStringArray()
+	for i in range(min(rows.size(), 5)):
+		lines.append("%d. %s   %d PTS" % [i + 1, rows[i]["name"], rows[i]["points"]])
+	return "\n".join(lines)
+
+func _save_championship() -> void:
+	var config := ConfigFile.new()
+	config.set_value("season", "round", championship_round)
+	config.set_value("season", "base_track", championship_base_track)
+	config.set_value("season", "standings", championship_standings)
+	config.save(CHAMPIONSHIP_SAVE_PATH)
+
+func _load_championship() -> void:
+	var config := ConfigFile.new()
+	if config.load(CHAMPIONSHIP_SAVE_PATH) != OK:
+		return
+	championship_round = int(config.get_value("season", "round", 0))
+	championship_base_track = int(config.get_value("season", "base_track", 0))
+	championship_standings = config.get_value("season", "standings", {})
