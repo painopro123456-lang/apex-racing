@@ -1163,14 +1163,14 @@ func _process(delta: float) -> void:
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
-			var countdown_text := "QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining))))
+			var countdown_text := "FORMATION LAP  •  %d" % int(ceil(countdown_remaining)) if race_phase == "FORMATION" else ("QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining))))
 			race_status_label.text = countdown_text
 		else:
 			race_active = true
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
-			race_status_label.text = "QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"))
+			race_status_label.text = "FORMATION LAP  •  FOLLOW THE PACK" if race_phase == "FORMATION" else ("QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"))
 		return
 	elapsed += delta
 	if is_instance_valid(player):
@@ -1285,8 +1285,6 @@ func _update_player_lap() -> void:
 		var count := track_points.size()
 		if player_last_track_index > int(count * 0.8) and current_index < int(count * 0.2):
 			player_laps += 1
-			if race_phase == "FORMATION":
-				return
 			if race_phase == "QUALIFYING":
 				var lap_time := elapsed - qualifying_lap_start_time
 				if lap_time > 0.1 and not qualifying_lap_invalid:
@@ -1309,7 +1307,7 @@ func _get_player_position(player_progress: float) -> int:
 	return ahead + 1
 
 func _update_track_limits(delta: float) -> void:
-	if (race_phase != "RACE" and race_phase != "QUALIFYING") or track_points.size() < 4:
+	if (race_phase != "RACE" and race_phase != "QUALIFYING" and race_phase != "FORMATION") or track_points.size() < 4:
 		return
 	var nearest_index := _nearest_track_index(player.global_position)
 	var nearest_distance := player.global_position.distance_to(track_points[nearest_index])
@@ -1352,6 +1350,8 @@ func _trigger_yellow_flag(reason: String) -> void:
 func _clear_yellow_flag() -> void:
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.caution_mode = false
+	if is_instance_valid(player):
+		player.max_speed = 88.0
 
 func _update_collision_penalties() -> void:
 	var current_collisions := int(player.collision_count)
@@ -1506,6 +1506,7 @@ func _complete_formation_lap() -> void:
 
 func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	race_phase = "RACE"
+	player.max_speed = 88.0
 	penalty_seconds = 0.0
 	track_limit_count = 0
 	track_limit_timer = 0.0
