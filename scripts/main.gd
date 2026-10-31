@@ -87,6 +87,7 @@ var is_dnf := false
 var dnf_reason := ""
 var race_control_label: Label
 var qualifying_best_lap := INF
+var qualifying_lap_invalid := false
 var qualifying_lap_start_time := 0.0
 var qualifying_grid_position := 1
 var track_setup: Dictionary = {}
@@ -505,6 +506,7 @@ func _start_race(mode: String = "RACE") -> void:
 	race_lap_limit = 2
 	race_phase = "QUALIFYING"
 	qualifying_best_lap = INF
+	qualifying_lap_invalid = false
 	qualifying_lap_start_time = 0.0
 	qualifying_grid_position = 1
 	race_started = true
@@ -1270,8 +1272,11 @@ func _update_player_lap() -> void:
 			player_laps += 1
 			if race_phase == "QUALIFYING":
 				var lap_time := elapsed - qualifying_lap_start_time
-				if lap_time > 0.1:
+				if lap_time > 0.1 and not qualifying_lap_invalid:
 					qualifying_best_lap = min(qualifying_best_lap, lap_time)
+				elif qualifying_lap_invalid:
+					engineer_message = "Lap deleted for track limits. Push on this lap."
+				qualifying_lap_invalid = false
 				qualifying_lap_start_time = elapsed
 	player_last_track_index = current_index
 
@@ -1287,7 +1292,7 @@ func _get_player_position(player_progress: float) -> int:
 	return ahead + 1
 
 func _update_track_limits(delta: float) -> void:
-	if race_phase != "RACE" or track_points.size() < 4:
+	if (race_phase != "RACE" and race_phase != "QUALIFYING") or track_points.size() < 4:
 		return
 	var nearest_index := _nearest_track_index(player.global_position)
 	var nearest_distance := player.global_position.distance_to(track_points[nearest_index])
@@ -1297,13 +1302,17 @@ func _update_track_limits(delta: float) -> void:
 		track_limit_timer += delta
 		if track_limit_timer >= 0.8 and not track_limit_outside:
 			track_limit_outside = true
-			track_limit_count += 1
-			if track_limit_count >= 3 and (track_limit_count - 3) % 2 == 0:
-				_issue_time_penalty("Repeated track-limit violations", 5.0)
+			if race_phase == "QUALIFYING":
+				qualifying_lap_invalid = true
+				engineer_message = "Track limits. LAP DELETED. Stay within the white lines."
 			else:
-				engineer_message = "Track limits warning %d. Keep all four wheels inside the white line." % track_limit_count
-				if is_instance_valid(engineer_label):
-					engineer_label.text = engineer_message
+				track_limit_count += 1
+				if track_limit_count >= 3 and (track_limit_count - 3) % 2 == 0:
+					_issue_time_penalty("Repeated track-limit violations", 5.0)
+				else:
+					engineer_message = "Track limits warning %d. Keep all four wheels inside the white line." % track_limit_count
+			if is_instance_valid(engineer_label):
+				engineer_label.text = engineer_message
 	else:
 		track_limit_timer = 0.0
 		track_limit_outside = false
