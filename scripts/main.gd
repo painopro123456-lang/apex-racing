@@ -362,17 +362,21 @@ func _build_menu() -> void:
 	for track in TRACKS:
 		track_select.add_item(track)
 	track_select.select(selected_track)
-	track_select.item_selected.connect(func(index: int):\n\t\tselected_track = index\n\t\t_save_profile())
+	track_select.item_selected.connect(func(index: int):
+		selected_track = index
+		_save_profile())
 	race_page.add_child(track_select)
 	_add_menu_label(race_page, "TYRE COMPOUND")
 	var tyre_select := OptionButton.new()
 	for compound in ["SOFT", "MEDIUM", "HARD"]:
 		tyre_select.add_item(compound)
 	tyre_select.select(1)
-	tyre_select.item_selected.connect(func(index: int):\n\t\tselected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index]\n\t\t_save_profile())
+	tyre_select.item_selected.connect(func(index: int):
+		selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index]
+		_save_profile())
 	race_page.add_child(tyre_select)
 	var race_summary := Label.new()
-	race_summary.text = "2-LAP QUALIFYING  +  MAIN RACE   •   22-CAR GRID"
+	race_summary.text = "2-LAP QUALIFYING  +  8-LAP GRAND PRIX   •   22-CAR GRID"
 	race_summary.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
 	race_page.add_child(race_summary)
 	var start := Button.new()
@@ -465,14 +469,19 @@ func _build_menu() -> void:
 	for quality_name in ["LOW  •  INTEGRATED GPU", "BALANCED", "HIGH", "ULTRA"]:
 		quality_select.add_item(quality_name)
 	quality_select.select(graphics_quality)
-	quality_select.item_selected.connect(func(index: int):\n\t\tgraphics_quality = index\n\t\t_apply_graphics_quality()\n\t\t_save_profile())
+	quality_select.item_selected.connect(func(index: int):
+		graphics_quality = index
+		_apply_graphics_quality()
+		_save_profile())
 	settings.add_child(quality_select)
 	_add_menu_label(settings, "AI DIFFICULTY")
 	var difficulty_select := OptionButton.new()
 	for difficulty_name in ["ROOKIE", "AMATEUR", "PROFESSIONAL", "EXPERT", "LEGEND"]:
 		difficulty_select.add_item(difficulty_name)
 	difficulty_select.select(ai_difficulty)
-	difficulty_select.item_selected.connect(func(index: int):\n\t\tai_difficulty = index\n\t\t_save_profile())
+	difficulty_select.item_selected.connect(func(index: int):
+		ai_difficulty = index
+		_save_profile())
 	settings.add_child(difficulty_select)
 	var settings_note := Label.new()
 	settings_note.text = "Graphics quality controls visual effects. AI difficulty changes opponent pace: Rookie is relaxed, Legend is the toughest."
@@ -534,7 +543,7 @@ func _start_race(mode: String = "RACE") -> void:
 	race_mode = mode
 	if race_mode == "CHAMPIONSHIP":
 		selected_track = (championship_base_track + championship_round) % TRACKS.size()
-	main_race_lap_limit = 5 if race_mode == "PRACTICE" else TRACK_LAPS[selected_track]
+	main_race_lap_limit = 5 if race_mode == "PRACTICE" else 8
 	race_lap_limit = 2
 	race_phase = "QUALIFYING"
 	qualifying_best_lap = INF
@@ -549,7 +558,8 @@ func _start_race(mode: String = "RACE") -> void:
 	menu_layer.queue_free()
 	_build_track(selected_track)
 	_build_player()
-	_apply_car_performance()\n\t_apply_track_setup()
+	_apply_car_performance()
+	_apply_track_setup()
 	player.tyre_compound = selected_tyre_compound
 	_build_ai()
 	_build_hud()
@@ -1771,7 +1781,9 @@ func _finish_race() -> void:
 			career_best_qualifying = min(career_best_qualifying, qualifying_best_lap)
 	if race_mode == "CHAMPIONSHIP":
 		points_earned = _award_championship_points()
-		championship_round_complete = true\n\t\t_save_championship()\n\t\ttotal_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))\n	var result_layer := CanvasLayer.new()
+			championship_round_complete = true
+		_save_championship()
+		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))\n	var result_layer := CanvasLayer.new()
 	add_child(result_layer)
 	var result_panel := PanelContainer.new()
 	result_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -1810,7 +1822,12 @@ func _finish_race() -> void:
 			season_button.text = "FINISH CHAMPIONSHIP"
 			season_button.pressed.connect(_complete_championship)
 		result_column.add_child(season_button)
-	else:\n\t\tvar close_button := Button.new()\n\t\tclose_button.text = "EXIT GAME"\n\t\tclose_button.pressed.connect(func(): get_tree().quit())\n\t\tresult_column.add_child(close_button)\n\t_save_profile()\n
+	else:
+		var close_button := Button.new()
+		close_button.text = "EXIT GAME"
+		close_button.pressed.connect(func(): get_tree().quit())
+		result_column.add_child(close_button)
+	_save_profile()\n
 func _start_championship() -> void:
 	championship_active = true
 	championship_round_complete = false
@@ -1928,6 +1945,7 @@ func _save_profile() -> void:
 	config.set_value("profile", "tyre", selected_tyre_compound)
 	config.set_value("profile", "difficulty", ai_difficulty)
 	config.set_value("profile", "graphics", graphics_quality)
+	config.set_value("profile", "last_saved_unix", int(Time.get_unix_time_from_system()))
 	config.set_value("career", "races", career_races)
 	config.set_value("career", "wins", career_wins)
 	config.set_value("career", "podiums", career_podiums)
