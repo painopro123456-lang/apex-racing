@@ -78,6 +78,14 @@ var pit_alert_tyres := false
 var pit_alert_fuel := false
 var race_phase := "IDLE"
 var main_race_lap_limit := 3
+var penalty_seconds := 0.0
+var track_limit_count := 0
+var track_limit_timer := 0.0
+var track_limit_outside := false
+var last_seen_collision_count := 0
+var is_dnf := false
+var dnf_reason := ""
+var race_control_label: Label
 var qualifying_best_lap := INF
 var qualifying_lap_start_time := 0.0
 var qualifying_grid_position := 1
@@ -1076,6 +1084,8 @@ func _build_hud() -> void:
 	engineer_col.add_child(_hud_label("RACE ENGINEER  /  RADIO", 11, Color(0.55, 0.78, 0.94)))
 	gap_label = _hud_label("GAP BEHIND  --", 12, Color.WHITE)
 	engineer_col.add_child(gap_label)
+	race_control_label = _hud_label("RACE CONTROL  •  PENALTIES 0.0s", 10, Color(0.98, 0.78, 0.25))
+	engineer_col.add_child(race_control_label)
 	engineer_label = _hud_label(engineer_message, 12, Color(0.9, 0.93, 0.97))
 	engineer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	engineer_col.add_child(engineer_label)
@@ -1142,6 +1152,14 @@ func _process(delta: float) -> void:
 		return
 	elapsed += delta
 	if is_instance_valid(player):
+		if player.global_position.y < -2.0:
+			_retire_player("Car went off the circuit")
+			return
+		if player.damage >= 100.0:
+			_retire_player("Terminal car damage")
+			return
+		_update_track_limits(delta)
+		_update_collision_penalties()
 		speed_label.text = "Speed  %03d km/h\\nSession time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
 		_update_sector_timing(delta)
@@ -1150,6 +1168,8 @@ func _process(delta: float) -> void:
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
 		systems_label.text = "FUEL  %02d%%  •  DAMAGE %02d%%" % [int(player.fuel_remaining), int(player.damage)]
+		if is_instance_valid(race_control_label):
+			race_control_label.text = "RACE CONTROL  •  PENALTIES %.0fs  •  LIMITS %d" % [penalty_seconds, track_limit_count]
 		if not track_setup.is_empty():
 			setup_label.text = "BB %.0f%%  •  AERO %.0f  •  FW %.0f / RW %.0f" % [track_setup["brake_bias"], track_setup["aero"], track_setup["front_wing"], track_setup["rear_wing"]]
 		drs_label.text = "DRS  •  ACTIVE" if player.drs_active else ("DRS  •  AVAILABLE" if player.drs_zone else "DRS  •  DISABLED")
@@ -1258,6 +1278,70 @@ func _get_player_position(player_progress: float) -> int:
 		if score > player_progress:
 			ahead += 1
 	return ahead + 1
+
+func _update_track_limits(delta: float) -> void:
+	if race_phase != "RACE" or track_points.size() < 4:
+		return
+	var nearest_index := _nearest_track_index(player.global_position)
+	var nearest_distance := player.global_position.distance_to(track_points[nearest_index])
+	# 9 m allows for kerbs and the spacing between generated centreline samples.
+	var outside_limits := nearest_distance > 9.0 and abs(player.speed) > 8.0
+	if outside_limits:
+		track_limit_timer += delta
+		if track_limit_timer >= 0.8 and not track_limit_outside:
+			track_limit_outside = true
+			track_limit_count += 1
+			if track_limit_count >= 3 and (track_limit_count - 3) % 2 == 0:
+				_issue_time_penalty("Repeated track-limit violations", 5.0)
+			else:
+				engineer_message = "Track limits warning %d. Keep all four wheels inside the white line." % track_limit_count
+				if is_instance_valid(engineer_label):
+					engineer_label.text = engineer_message
+	else:
+		track_limit_timer = 0.0
+		track_limit_outside = false
+
+func _update_collision_penalties() -> void:
+	var current_collisions := int(player.collision_count)
+	while last_seen_collision_count < current_collisions:
+		last_seen_collision_count += 1
+		if last_seen_collision_count >= 3 and last_seen_collision_count % 2 == 1:
+			_issue_time_penalty("Repeated avoidable contact", 5.0)
+
+func _issue_time_penalty(reason: String, seconds: float) -> void:
+	penalty_seconds += seconds
+	engineer_message = "RACE CONTROL: %s. +%.0fs. Total penalty %.0fs." % [reason, seconds, penalty_seconds]
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+
+func _retire_player(reason: String) -> void:
+	if race_finished:
+		return
+	is_dnf = true
+	dnf_reason = reason
+	race_phase = "DNF"
+	engineer_message = "BOX BOX. Car retired: %s." % reason
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+	_finish_race()
+
+func _position_after_penalties() -> int:
+	var base_position := _get_player_position(_player_progress_score())
+	if penalty_seconds <= 0.0:
+		return base_position
+	var player_score := _player_progress_score()
+	var circuit_length := _track_length()
+	var demotions := 0
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		var opponent_score := float(opponent.completed_laps * track_points.size() + opponent.progress_index)
+		if opponent_score >= player_score:
+			continue
+		var distance_points := player_score - opponent_score
+		var average_speed := max((abs(player.speed) + float(opponent.current_speed)) * 0.5, 12.0)
+		var estimated_gap := distance_points * circuit_length / max(track_points.size(), 1) / average_speed
+		if penalty_seconds >= estimated_gap:
+			demotions += 1
+	return clampi(base_position + demotions, base_position, 22)
 
 func _track_length() -> float:
 	var total := 0.0
@@ -1507,7 +1591,8 @@ func _finish_race() -> void:
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.set_process(false)
 	race_status_label.text = "FINISHED"
-	var player_position := _get_player_position(_player_progress_score())
+	var player_position := 22 if is_dnf else _position_after_penalties()
+	var classified_time := elapsed + penalty_seconds
 	var points_earned := 0
 	var total_points := 0
 	if race_mode == "CHAMPIONSHIP":
@@ -1531,9 +1616,9 @@ func _finish_race() -> void:
 	result_column.add_child(heading)
 	var result := Label.new()
 	if race_mode == "CHAMPIONSHIP":
-		result.text = "%s finishes P%d\n%s\n+%d points  •  Season total: %d\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, TRACKS[selected_track], points_earned, total_points, elapsed]
+		result.text = ("%s  •  DNF\n%s\n0 points  •  %s\nPenalties: %.0fs" % [DRIVERS_BY_TEAM[selected_team][selected_driver], TRACKS[selected_track], dnf_reason, penalty_seconds]) if is_dnf else ("%s finishes P%d\n%s\n+%d points  •  Season total: %d\nClassified time: %05.1f s  (+%.0fs penalties)" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, TRACKS[selected_track], points_earned, total_points, classified_time, penalty_seconds])
 	else:
-		result.text = "%s finishes P%d\n%d laps  •  %s\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, race_lap_limit, TRACKS[selected_track], elapsed]
+		result.text = ("%s  •  DNF\n%s\n%s\nPenalties: %.0fs" % [DRIVERS_BY_TEAM[selected_team][selected_driver], TRACKS[selected_track], dnf_reason, penalty_seconds]) if is_dnf else ("%s finishes P%d\n%d laps  •  %s\nClassified time: %05.1f s  (+%.0fs penalties)" % [DRIVERS_BY_TEAM[selected_team][selected_driver], player_position, race_lap_limit, TRACKS[selected_track], classified_time, penalty_seconds])
 	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_column.add_child(result)
 	if race_mode == "CHAMPIONSHIP":
