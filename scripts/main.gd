@@ -32,6 +32,17 @@ const DRIVER_NUMBERS_BY_TEAM := [
 	["30", "41"], ["14", "18"], ["31", "87"], ["27", "5"], ["10", "43"], ["11", "77"]
 ]
 const CAR_ERAS := ["2026 Ground Effect", "2010s V8 Hybrid", "2000s V10", "1990s V12 Classic"]
+# Official-style Grand Prix race distances for the named venues; prototype tracks use shorter custom events.
+const TRACK_LAPS := [20, 25, 30, 78, 52, 53, 44, 53, 57, 62, 58, 71, 72, 63, 66]
+const ERA_CAR_STATS := [
+	{"horsepower": 1000, "max_speed": 355.0, "handling": 94, "zero_to_100": 2.5},
+	{"horsepower": 900, "max_speed": 350.0, "handling": 91, "zero_to_100": 2.6},
+	{"horsepower": 920, "max_speed": 360.0, "handling": 87, "zero_to_100": 2.5},
+	{"horsepower": 750, "max_speed": 340.0, "handling": 82, "zero_to_100": 2.9}
+]
+const TEAM_POWER_MODIFIERS := [1.00, 1.01, 1.02, 1.01, 0.98, 0.97, 0.98, 0.97, 0.99, 0.98, 0.99]
+const TEAM_HANDLING_MODIFIERS := [1.00, 1.01, 1.00, 1.01, 0.99, 0.98, 0.99, 0.98, 0.99, 1.00, 0.98]
+const PROFILE_SAVE_PATH := "user://apex_profile.cfg"
 const TRACKS := [
 	"Apex GP Oval", "Desert Ring", "Harbor Grand Prix",
 	"Monaco Street Circuit", "Silverstone GP", "Monza", "Spa-Francorchamps",
@@ -131,8 +142,13 @@ var graphics_quality := 2
 var material_cache: Dictionary = {}
 var world_environment: WorldEnvironment
 var sun_light: DirectionalLight3D
+var career_races := 0
+var career_wins := 0
+var career_podiums := 0
+var career_best_qualifying := INF
 
 func _ready() -> void:
+	_load_profile()
 	_load_championship()
 	_build_environment()
 	_build_menu()
@@ -346,14 +362,14 @@ func _build_menu() -> void:
 	for track in TRACKS:
 		track_select.add_item(track)
 	track_select.select(selected_track)
-	track_select.item_selected.connect(func(index: int): selected_track = index)
+	track_select.item_selected.connect(func(index: int):\n\t\tselected_track = index\n\t\t_save_profile())
 	race_page.add_child(track_select)
 	_add_menu_label(race_page, "TYRE COMPOUND")
 	var tyre_select := OptionButton.new()
 	for compound in ["SOFT", "MEDIUM", "HARD"]:
 		tyre_select.add_item(compound)
 	tyre_select.select(1)
-	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
+	tyre_select.item_selected.connect(func(index: int):\n\t\tselected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index]\n\t\t_save_profile())
 	race_page.add_child(tyre_select)
 	var race_summary := Label.new()
 	race_summary.text = "2-LAP QUALIFYING  +  MAIN RACE   •   22-CAR GRID"
@@ -413,6 +429,19 @@ func _build_menu() -> void:
 	era_select.select(selected_car_era)
 	era_select.item_selected.connect(func(index: int): selected_car_era = index)
 	garage.add_child(era_select)
+	var car_stats_label := Label.new()
+	car_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	car_stats_label.add_theme_font_size_override("font_size", 14)
+	car_stats_label.add_theme_color_override("font_color", Color(0.72, 0.86, 1.0))
+	garage.add_child(car_stats_label)
+	var refresh_car_stats := func():
+		car_stats_label.text = _selected_car_stats_text()
+		_save_profile()
+	team_select.item_selected.connect(func(_index: int): refresh_car_stats.call())
+	driver_select.item_selected.connect(func(_index: int): refresh_car_stats.call())
+	era_select.item_selected.connect(func(_index: int): refresh_car_stats.call())
+	race_driver_select.item_selected.connect(func(_index: int): refresh_car_stats.call())
+	refresh_car_stats.call()
 	var garage_note := Label.new()
 	garage_note.text = "Selected team colours are used as the car's base livery."
 	garage_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -436,14 +465,14 @@ func _build_menu() -> void:
 	for quality_name in ["LOW  •  INTEGRATED GPU", "BALANCED", "HIGH", "ULTRA"]:
 		quality_select.add_item(quality_name)
 	quality_select.select(graphics_quality)
-	quality_select.item_selected.connect(func(index: int): graphics_quality = index)
+	quality_select.item_selected.connect(func(index: int):\n\t\tgraphics_quality = index\n\t\t_apply_graphics_quality()\n\t\t_save_profile())
 	settings.add_child(quality_select)
 	_add_menu_label(settings, "AI DIFFICULTY")
 	var difficulty_select := OptionButton.new()
 	for difficulty_name in ["ROOKIE", "AMATEUR", "PROFESSIONAL", "EXPERT", "LEGEND"]:
 		difficulty_select.add_item(difficulty_name)
 	difficulty_select.select(ai_difficulty)
-	difficulty_select.item_selected.connect(func(index: int): ai_difficulty = index)
+	difficulty_select.item_selected.connect(func(index: int):\n\t\tai_difficulty = index\n\t\t_save_profile())
 	settings.add_child(difficulty_select)
 	var settings_note := Label.new()
 	settings_note.text = "Graphics quality controls visual effects. AI difficulty changes opponent pace: Rookie is relaxed, Legend is the toughest."
@@ -505,7 +534,7 @@ func _start_race(mode: String = "RACE") -> void:
 	race_mode = mode
 	if race_mode == "CHAMPIONSHIP":
 		selected_track = (championship_base_track + championship_round) % TRACKS.size()
-	main_race_lap_limit = 5 if race_mode == "PRACTICE" or race_mode == "CHAMPIONSHIP" else 3
+	main_race_lap_limit = 5 if race_mode == "PRACTICE" else TRACK_LAPS[selected_track]
 	race_lap_limit = 2
 	race_phase = "QUALIFYING"
 	qualifying_best_lap = INF
@@ -520,7 +549,7 @@ func _start_race(mode: String = "RACE") -> void:
 	menu_layer.queue_free()
 	_build_track(selected_track)
 	_build_player()
-	_apply_track_setup()
+	_apply_car_performance()\n\t_apply_track_setup()
 	player.tyre_compound = selected_tyre_compound
 	_build_ai()
 	_build_hud()
@@ -1394,8 +1423,8 @@ func _retire_player(reason: String) -> void:
 	is_dnf = true
 	dnf_reason = reason
 	if is_instance_valid(race_flag_label):
-		race_flag_label.text = "RED FLAG  •  SESSION STOPPED"
-		race_flag_label.add_theme_color_override("font_color", Color(1.0, 0.18, 0.2))
+		race_flag_label.text = "DNF  •  CAR RETIRED"
+		race_flag_label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35))
 	race_phase = "DNF"
 	engineer_message = "BOX BOX. Car retired: %s." % reason
 	if is_instance_valid(engineer_label):
@@ -1549,8 +1578,7 @@ func _complete_formation_lap() -> void:
 
 func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	race_phase = "RACE"
-	player.max_speed = 88.0
-	penalty_seconds = 0.0
+	_apply_car_performance()\n\tpenalty_seconds = 0.0
 	track_limit_count = 0
 	track_limit_timer = 0.0
 	track_limit_outside = false
@@ -1733,12 +1761,17 @@ func _finish_race() -> void:
 	var classified_time := elapsed + penalty_seconds
 	var points_earned := 0
 	var total_points := 0
+	if race_mode != "PRACTICE":
+		career_races += 1
+		if not is_dnf and player_position == 1:
+			career_wins += 1
+		if not is_dnf and player_position <= 3:
+			career_podiums += 1
+		if qualifying_best_lap < INF:
+			career_best_qualifying = min(career_best_qualifying, qualifying_best_lap)
 	if race_mode == "CHAMPIONSHIP":
 		points_earned = _award_championship_points()
-		championship_round_complete = true
-		_save_championship()
-		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))
-	var result_layer := CanvasLayer.new()
+		championship_round_complete = true\n\t\t_save_championship()\n\t\ttotal_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))\n	var result_layer := CanvasLayer.new()
 	add_child(result_layer)
 	var result_panel := PanelContainer.new()
 	result_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -1777,12 +1810,7 @@ func _finish_race() -> void:
 			season_button.text = "FINISH CHAMPIONSHIP"
 			season_button.pressed.connect(_complete_championship)
 		result_column.add_child(season_button)
-	else:
-		var close_button := Button.new()
-		close_button.text = "EXIT GAME"
-		close_button.pressed.connect(func(): get_tree().quit())
-		result_column.add_child(close_button)
-
+	else:\n\t\tvar close_button := Button.new()\n\t\tclose_button.text = "EXIT GAME"\n\t\tclose_button.pressed.connect(func(): get_tree().quit())\n\t\tresult_column.add_child(close_button)\n\t_save_profile()\n
 func _start_championship() -> void:
 	championship_active = true
 	championship_round_complete = false
@@ -1870,6 +1898,64 @@ func _championship_standings_text() -> String:
 	for i in range(min(rows.size(), 5)):
 		lines.append("%d. %s   %d PTS" % [i + 1, rows[i]["name"], rows[i]["points"]])
 	return "\n".join(lines)
+
+func _selected_car_stats() -> Dictionary:
+	var base: Dictionary = ERA_CAR_STATS[clampi(selected_car_era, 0, ERA_CAR_STATS.size() - 1)].duplicate()
+	var team_index := clampi(selected_team, 0, TEAM_NAMES.size() - 1)
+	base["horsepower"] = int(round(float(base["horsepower"]) * TEAM_POWER_MODIFIERS[team_index]))
+	base["max_speed"] = snappedf(float(base["max_speed"]) + (TEAM_POWER_MODIFIERS[team_index] - 1.0) * 95.0, 1.0)
+	base["handling"] = clampi(int(round(float(base["handling"]) * TEAM_HANDLING_MODIFIERS[team_index])), 1, 100)
+	return base
+
+func _selected_car_stats_text() -> String:
+	var stats := _selected_car_stats()
+	return "CAR PERFORMANCE  •  %s\\n%d HP     %d KM/H TOP SPEED\\nHANDLING  %d/100     0–100 KM/H  %.1fs" % [CAR_ERAS[selected_car_era], int(stats["horsepower"]), int(stats["max_speed"]), int(stats["handling"]), float(stats["zero_to_100"])]
+
+func _apply_car_performance() -> void:
+	if not is_instance_valid(player):
+		return
+	var stats := _selected_car_stats()
+	player.max_speed = float(stats["max_speed"]) / 3.6
+	player.acceleration = 22.0 + (float(stats["horsepower"]) - 750.0) * 0.012
+	player.lateral_grip = 6.5 + float(stats["handling"]) * 0.025
+
+func _save_profile() -> void:
+	var config := ConfigFile.new()
+	config.set_value("profile", "team", selected_team)
+	config.set_value("profile", "driver", selected_driver)
+	config.set_value("profile", "track", selected_track)
+	config.set_value("profile", "car_era", selected_car_era)
+	config.set_value("profile", "tyre", selected_tyre_compound)
+	config.set_value("profile", "difficulty", ai_difficulty)
+	config.set_value("profile", "graphics", graphics_quality)
+	config.set_value("career", "races", career_races)
+	config.set_value("career", "wins", career_wins)
+	config.set_value("career", "podiums", career_podiums)
+	config.set_value("career", "best_qualifying", career_best_qualifying)
+	var error := config.save(PROFILE_SAVE_PATH)
+	if error != OK:
+		push_warning("Could not save Apex Racing profile: %s" % error_string(error))
+
+func _load_profile() -> void:
+	var config := ConfigFile.new()
+	if config.load(PROFILE_SAVE_PATH) != OK:
+		return
+	selected_team = clampi(int(config.get_value("profile", "team", selected_team)), 0, TEAM_NAMES.size() - 1)
+	selected_driver = clampi(int(config.get_value("profile", "driver", selected_driver)), 0, DRIVERS_BY_TEAM[selected_team].size() - 1)
+	selected_track = clampi(int(config.get_value("profile", "track", selected_track)), 0, TRACKS.size() - 1)
+	selected_car_era = clampi(int(config.get_value("profile", "car_era", selected_car_era)), 0, CAR_ERAS.size() - 1)
+	var saved_tyre := str(config.get_value("profile", "tyre", selected_tyre_compound))
+	selected_tyre_compound = saved_tyre if saved_tyre in ["SOFT", "MEDIUM", "HARD"] else "MEDIUM"
+	ai_difficulty = clampi(int(config.get_value("profile", "difficulty", ai_difficulty)), 0, 4)
+	graphics_quality = clampi(int(config.get_value("profile", "graphics", graphics_quality)), 0, 3)
+	career_races = max(0, int(config.get_value("career", "races", 0)))
+	career_wins = max(0, int(config.get_value("career", "wins", 0)))
+	career_podiums = max(0, int(config.get_value("career", "podiums", 0)))
+	career_best_qualifying = float(config.get_value("career", "best_qualifying", INF))
+
+func _exit_tree() -> void:
+	_save_profile()
+	_save_championship()
 
 func _save_championship() -> void:
 	var config := ConfigFile.new()
