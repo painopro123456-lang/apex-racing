@@ -31,7 +31,12 @@ const DRIVER_NUMBERS_BY_TEAM := [
 	["1", "81"], ["63", "12"], ["3", "6"], ["16", "44"], ["23", "55"],
 	["30", "41"], ["14", "18"], ["31", "87"], ["27", "5"], ["10", "43"], ["11", "77"]
 ]
-const TRACKS := ["Apex GP Oval", "Desert Ring", "Harbor Grand Prix"]
+const TRACKS := [
+	"Apex GP Oval", "Desert Ring", "Harbor Grand Prix",
+	"Monaco Street Circuit", "Silverstone GP", "Monza", "Spa-Francorchamps",
+	"Suzuka", "Bahrain International", "Singapore Marina Bay", "Albert Park",
+	"Interlagos", "Zandvoort", "Imola", "Portimao"
+]
 
 var player: CharacterBody3D
 var speed_label: Label
@@ -255,6 +260,8 @@ func _build_track(track_index: int) -> void:
 				var radius_x := 58.0 + 13.0 * sin(3.0 * a) + 5.0 * cos(5.0 * a)
 				var radius_z := 43.0 + 9.0 * cos(2.0 * a)
 				points.append(Vector3(cos(a) * radius_x, 0, sin(a) * radius_z))
+		_:
+			points = _named_circuit_points(track_index, 192)
 	track_points = points
 	track_radius = 52.0 if track_index == 0 else 57.0
 	var road_mat := _mat(Color(0.105, 0.115, 0.13))
@@ -277,6 +284,36 @@ func _build_track(track_index: int) -> void:
 	_add_trackside_scenery(points)
 	_add_pit_lane(points, road_mat)
 	_add_box(Vector3(0, 1, -track_radius - 17), Vector3(38, 2, 8), Color(0.68, 0.73, 0.8))
+
+func _named_circuit_points(track_index: int, count: int) -> Array[Vector3]:
+	# Distinct fictionalised centreline layouts inspired by the character of each venue.
+	# These are original approximations, not surveyed or exact licensed circuit maps.
+	var shapes := [
+		[60.0, 43.0, 0.10, 0.08, 0.035, 0.02],
+		[67.0, 40.0, 0.16, 0.045, 0.025, 0.06],
+		[64.0, 46.0, 0.07, 0.14, 0.045, 0.035],
+		[62.0, 39.0, 0.19, 0.12, 0.035, 0.075],
+		[70.0, 42.0, 0.13, 0.055, 0.07, 0.025],
+		[66.0, 38.0, 0.08, 0.035, 0.10, 0.045],
+		[72.0, 45.0, 0.14, 0.09, 0.055, 0.08],
+		[61.0, 44.0, 0.055, 0.15, 0.08, 0.025],
+		[68.0, 41.0, 0.12, 0.07, 0.03, 0.095],
+		[63.0, 42.0, 0.17, 0.045, 0.075, 0.055],
+		[69.0, 39.0, 0.09, 0.11, 0.04, 0.10],
+		[65.0, 46.0, 0.045, 0.16, 0.065, 0.04]
+	]
+	var shape: Array = shapes[clampi(track_index - 3, 0, shapes.size() - 1)]
+	var points: Array[Vector3] = []
+	var rx: float = shape[0]
+	var rz: float = shape[1]
+	for i in range(count):
+		var a := TAU * float(i) / float(count)
+		var x := rx * cos(a)
+		var z := rz * sin(a)
+		x += rx * (float(shape[2]) * sin(2.0 * a + 0.25) + float(shape[3]) * cos(3.0 * a - 0.4) + float(shape[4]) * sin(5.0 * a))
+		z += rz * (float(shape[3]) * sin(2.0 * a + 0.6) + float(shape[4]) * cos(3.0 * a) + float(shape[5]) * sin(4.0 * a - 0.3))
+		points.append(Vector3(x, 0.0, z))
+	return points
 
 func _add_trackside_scenery(points: Array[Vector3]) -> void:
 	# Sparse, low-poly trackside dressing keeps the circuit readable on integrated GPUs.
