@@ -1239,7 +1239,7 @@ func _process(delta: float) -> void:
 			return
 		_update_track_limits(delta)
 		_update_collision_penalties()
-		speed_label.text = "Speed  %03d km/h\\nSession time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
+		speed_label.text = "Speed  %03d km/h\nSession time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
 		_update_sector_timing(delta)
 		_update_leaderboard()
@@ -1516,7 +1516,7 @@ func _finish_qualifying() -> void:
 	var heading := _hud_label("QUALIFYING COMPLETE", 24, Color(0.35, 0.82, 1.0))
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(heading)
-	var timing := _hud_label("BEST LAP  %s\\nSTARTING POSITION  P%02d" % [_format_sector_time(qualifying_best_lap if qualifying_best_lap < INF else elapsed), qualifying_grid_position], 18, Color.WHITE)
+	var timing := _hud_label("BEST LAP  %s\nSTARTING POSITION  P%02d" % [_format_sector_time(qualifying_best_lap if qualifying_best_lap < INF else elapsed), qualifying_grid_position], 18, Color.WHITE)
 	timing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(timing)
 	var note := _hud_label("Your two timed laps are complete. The grid is set from qualifying pace.", 12, Color(0.68, 0.77, 0.88))
@@ -1782,9 +1782,10 @@ func _finish_race() -> void:
 			career_best_qualifying = min(career_best_qualifying, qualifying_best_lap)
 	if race_mode == "CHAMPIONSHIP":
 		points_earned = _award_championship_points()
-			championship_round_complete = true
+		championship_round_complete = true
 		_save_championship()
-		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))\n	var result_layer := CanvasLayer.new()
+		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))
+	var result_layer := CanvasLayer.new()
 	add_child(result_layer)
 	var result_panel := PanelContainer.new()
 	result_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -1828,7 +1829,8 @@ func _finish_race() -> void:
 		close_button.text = "EXIT GAME"
 		close_button.pressed.connect(func(): get_tree().quit())
 		result_column.add_child(close_button)
-	_save_profile()\n
+	_save_profile()
+
 func _start_championship() -> void:
 	championship_active = true
 	championship_round_complete = false
@@ -1863,7 +1865,7 @@ func _show_championship_continue() -> void:
 	heading.add_theme_font_size_override("font_size", 24)
 	column.add_child(heading)
 	var standings := Label.new()
-	standings.text = "SAVED SEASON STANDINGS\\n" + _championship_standings_text()
+	standings.text = "SAVED SEASON STANDINGS\n" + _championship_standings_text()
 	standings.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(standings)
 	var continue_button := Button.new()
@@ -1927,7 +1929,7 @@ func _selected_car_stats() -> Dictionary:
 
 func _selected_car_stats_text() -> String:
 	var stats := _selected_car_stats()
-	return "CAR PERFORMANCE  •  %s\\n%d HP     %d KM/H TOP SPEED\\nHANDLING  %d/100     0–100 KM/H  %.1fs" % [CAR_ERAS[selected_car_era], int(stats["horsepower"]), int(stats["max_speed"]), int(stats["handling"]), float(stats["zero_to_100"])]
+	return "CAR PERFORMANCE  •  %s\n%d HP     %d KM/H TOP SPEED\nHANDLING  %d/100     0–100 KM/H  %.1fs" % [CAR_ERAS[selected_car_era], int(stats["horsepower"]), int(stats["max_speed"]), int(stats["handling"]), float(stats["zero_to_100"])]
 
 func _apply_car_performance() -> void:
 	if not is_instance_valid(player):
