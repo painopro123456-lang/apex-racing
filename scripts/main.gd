@@ -35,6 +35,10 @@ const TRACKS := ["Apex GP Oval", "Desert Ring", "Harbor Grand Prix"]
 
 var player: CharacterBody3D
 var speed_label: Label
+var gear_label: Label
+var ers_bar: ProgressBar
+var ers_percent_label: Label
+var drs_label: Label
 var menu_layer: CanvasLayer
 var elapsed := 0.0
 var track_radius := 52.0
@@ -417,42 +421,141 @@ func _mat(color: Color) -> StandardMaterial3D:
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var panel := PanelContainer.new()
-	panel.position = Vector2(22, 20)
-	panel.custom_minimum_size = Vector2(320, 112)
-	layer.add_child(panel)
-	var column := VBoxContainer.new()
-	panel.add_child(column)
-	var title := Label.new()
-	title.text = "%s  /  %s  (#%s)" % [TEAM_NAMES[selected_team], DRIVERS_BY_TEAM[selected_team][selected_driver], DRIVER_NUMBERS_BY_TEAM[selected_team][selected_driver]]
-	title.add_theme_font_size_override("font_size", 15)
-	column.add_child(title)
-	speed_label = Label.new()
-	speed_label.add_theme_font_size_override("font_size", 20)
-	column.add_child(speed_label)
-	var circuit := Label.new()
-	circuit.text = "%s  •  22-car field" % TRACKS[selected_track]
-	column.add_child(circuit)
-	tyre_label = Label.new()
-	tyre_label.add_theme_font_size_override("font_size", 14)
-	column.add_child(tyre_label)
-	systems_label = Label.new()
-	systems_label.add_theme_font_size_override("font_size", 14)
-	column.add_child(systems_label)
-	lap_label = Label.new()
-	lap_label.add_theme_font_size_override("font_size", 16)
-	column.add_child(lap_label)
-	position_label = Label.new()
-	position_label.add_theme_font_size_override("font_size", 16)
-	column.add_child(position_label)
-	race_status_label = Label.new()
-	race_status_label.add_theme_font_size_override("font_size", 22)
-	race_status_label.add_theme_color_override("font_color", Color(0.95, 0.78, 0.24))
-	column.add_child(race_status_label)
-	var controls := Label.new()
-	controls.text = "WASD drive  •  E ERS boost  •  SHIFT DRS  •  3-lap race"
-	controls.position = Vector2(22, 670)
-	layer.add_child(controls)
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(root)
+
+	# Compact race information at the upper left.
+	var info := PanelContainer.new()
+	info.position = Vector2(24, 22)
+	info.custom_minimum_size = Vector2(220, 104)
+	info.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.88), Color(0.25, 0.72, 0.95, 0.9)))
+	root.add_child(info)
+	var info_col := VBoxContainer.new()
+	info_col.add_theme_constant_override("separation", 4)
+	info.add_child(info_col)
+	var driver := _hud_label("%s  /  %s" % [TEAM_NAMES[selected_team], DRIVERS_BY_TEAM[selected_team][selected_driver]], 13, Color(0.66, 0.83, 0.96))
+	info_col.add_child(driver)
+	lap_label = _hud_label("LAP  1 / %d" % race_lap_limit, 20, Color.WHITE)
+	info_col.add_child(lap_label)
+	position_label = _hud_label("POSITION  01 / 22", 16, Color(0.95, 0.78, 0.28))
+	info_col.add_child(position_label)
+
+	# Bottom-centre telemetry pod, inspired by modern single-seater race displays.
+	var telemetry := PanelContainer.new()
+	telemetry.anchor_left = 0.5
+	telemetry.anchor_right = 0.5
+	telemetry.anchor_top = 1.0
+	telemetry.anchor_bottom = 1.0
+	telemetry.offset_left = -250
+	telemetry.offset_right = 250
+	telemetry.offset_top = -158
+	telemetry.offset_bottom = -20
+	telemetry.add_theme_stylebox_override("panel", _hud_style(Color(0.012, 0.019, 0.03, 0.94), Color(0.18, 0.58, 0.82, 0.95)))
+	root.add_child(telemetry)
+	var telemetry_col := VBoxContainer.new()
+	telemetry_col.add_theme_constant_override("separation", 5)
+	telemetry.add_child(telemetry_col)
+	var top_row := HBoxContainer.new()
+	top_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_row.add_theme_constant_override("separation", 22)
+	telemetry_col.add_child(top_row)
+	var speed_stack := VBoxContainer.new()
+	speed_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	speed_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_row.add_child(speed_stack)
+	speed_label = _hud_label("000", 42, Color.WHITE)
+	speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	speed_stack.add_child(speed_label)
+	var speed_unit := _hud_label("KM/H", 10, Color(0.55, 0.72, 0.84))
+	speed_unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	speed_stack.add_child(speed_unit)
+	var gear_stack := VBoxContainer.new()
+	gear_stack.custom_minimum_size.x = 82
+	gear_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	top_row.add_child(gear_stack)
+	gear_label = _hud_label("N", 38, Color(0.98, 0.77, 0.22))
+	gear_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gear_stack.add_child(gear_label)
+	var gear_caption := _hud_label("GEAR", 10, Color(0.55, 0.72, 0.84))
+	gear_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gear_stack.add_child(gear_caption)
+
+	var bottom_row := HBoxContainer.new()
+	bottom_row.add_theme_constant_override("separation", 12)
+	telemetry_col.add_child(bottom_row)
+	var ers_caption := _hud_label("ERS", 12, Color(0.36, 0.86, 0.72))
+	bottom_row.add_child(ers_caption)
+	ers_bar = ProgressBar.new()
+	ers_bar.custom_minimum_size = Vector2(260, 13)
+	ers_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ers_bar.min_value = 0
+	ers_bar.max_value = 100
+	ers_bar.show_percentage = false
+	bottom_row.add_child(ers_bar)
+	ers_percent_label = _hud_label("100%", 12, Color.WHITE)
+	bottom_row.add_child(ers_percent_label)
+
+	# DRS and tyre status are separated from the main speed readout.
+	var status := PanelContainer.new()
+	status.anchor_left = 1.0
+	status.anchor_right = 1.0
+	status.offset_left = -205
+	status.offset_right = -24
+	status.offset_top = 22
+	status.offset_bottom = 116
+	status.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.88), Color(0.25, 0.72, 0.95, 0.9)))
+	root.add_child(status)
+	var status_col := VBoxContainer.new()
+	status_col.add_theme_constant_override("separation", 5)
+	status.add_child(status_col)
+	drs_label = _hud_label("DRS  •  DISABLED", 16, Color(0.62, 0.69, 0.76))
+	status_col.add_child(drs_label)
+	tyre_label = _hud_label("TYRE  MEDIUM  •  100%", 13, Color.WHITE)
+	status_col.add_child(tyre_label)
+	systems_label = _hud_label("FUEL  100%", 13, Color(0.78, 0.84, 0.9))
+	status_col.add_child(systems_label)
+
+	race_status_label = _hud_label("GET READY", 24, Color(0.98, 0.78, 0.25))
+	race_status_label.anchor_left = 0.5
+	race_status_label.anchor_right = 0.5
+	race_status_label.offset_left = -180
+	race_status_label.offset_right = 180
+	race_status_label.offset_top = 24
+	race_status_label.offset_bottom = 60
+	race_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(race_status_label)
+
+	var controls := _hud_label("WASD DRIVE     E ERS     SHIFT DRS", 11, Color(0.72, 0.8, 0.88))
+	controls.anchor_left = 0.5
+	controls.anchor_right = 0.5
+	controls.anchor_top = 1.0
+	controls.anchor_bottom = 1.0
+	controls.offset_left = -180
+	controls.offset_right = 180
+	controls.offset_top = -18
+	controls.offset_bottom = -2
+	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(controls)
+
+func _hud_label(value: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	return label
+
+func _hud_style(fill: Color, edge: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = edge
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	return style
 
 func _process(delta: float) -> void:
 	if not race_started or race_finished:
@@ -475,7 +578,9 @@ func _process(delta: float) -> void:
 		var current_track_index := max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
-		systems_label.text = "FUEL  %02d%%  •  ERS  %02d%%  •  DRS  %s" % [int(player.fuel_remaining), int(player.ers_charge), "ON" if player.drs_active else "OFF"]
+		systems_label.text = "FUEL  %02d%%" % int(player.fuel_remaining)
+		drs_label.text = "DRS  •  ACTIVE" if player.drs_active else ("DRS  •  AVAILABLE" if player.drs_zone else "DRS  •  DISABLED")
+		drs_label.add_theme_color_override("font_color", Color(0.28, 0.95, 0.66) if player.drs_active else Color(0.62, 0.69, 0.76))
 		var progress := _player_progress_score()
 		var position := _get_player_position(progress)
 		lap_label.text = "LAP  %d / %d" % [min(player_laps + 1, race_lap_limit), race_lap_limit]
