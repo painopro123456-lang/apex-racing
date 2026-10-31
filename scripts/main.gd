@@ -124,7 +124,7 @@ func _build_menu() -> void:
 	track_select.item_selected.connect(func(index: int): selected_track = index)
 	column.add_child(track_select)
 	var info := Label.new()
-	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  12-car field"
+	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  22-car grid"
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88))
 	column.add_child(info)
@@ -234,15 +234,22 @@ func _build_player() -> void:
 	player.add_child(camera)
 
 func _build_ai() -> void:
-	for i in range(11):
-		var ai := Node3D.new()
-		ai.set_script(AI_SCRIPT)
-		ai.lane_offset = -5.0 + float(i % 6) * 1.8
-		ai.phase = 0.5 + float(i) * 0.48
-		ai.speed_factor = 0.75 + float(i % 5) * 0.045
-		ai.track_radius = track_radius
-		add_child(ai)
-		_car_visual(ai, TEAM_COLORS[(i + 1) % TEAM_COLORS.size()])
+	var grid_index := 0
+	for team_index in range(TEAM_NAMES.size()):
+		for driver_index in range(DRIVERS_BY_TEAM[team_index].size()):
+			if team_index == selected_team and driver_index == selected_driver:
+				continue
+			var ai := Node3D.new()
+			ai.set_script(AI_SCRIPT)
+			ai.driver_name = DRIVERS_BY_TEAM[team_index][driver_index]
+			ai.driver_number = DRIVER_NUMBERS_BY_TEAM[team_index][driver_index]
+			ai.lane_offset = -5.0 + float(grid_index % 6) * 1.8
+			ai.phase = 0.35 + float(grid_index) * (TAU / 21.0)
+			ai.speed_factor = 0.78 + float(grid_index % 7) * 0.035
+			ai.track_radius = track_radius
+			add_child(ai)
+			_car_visual(ai, TEAM_COLORS[team_index])
+			grid_index += 1
 
 func _car_visual(parent: Node3D, color: Color) -> void:
 	_add_car_box(parent, Vector3(1.5, 0.38, 3.6), Vector3(0, 0.36, 0), color)
