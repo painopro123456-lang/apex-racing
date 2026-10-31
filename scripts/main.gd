@@ -53,6 +53,8 @@ var selected_team := 0
 var selected_driver := 0
 var selected_track := 0
 var selected_car_era := 0
+var ai_difficulty := 2
+var race_mode := "RACE"
 var selected_tyre_compound := "MEDIUM"
 var tyre_label: Label
 var systems_label: Label
@@ -250,6 +252,11 @@ func _build_menu() -> void:
 	quick_button.custom_minimum_size = Vector2(0, 42)
 	quick_button.pressed.connect(_start_race)
 	hero_content.add_child(quick_button)
+	var practice_button := Button.new()
+	practice_button.text = "PRACTICE VS AI  —  5 LAPS"
+	practice_button.custom_minimum_size = Vector2(0, 42)
+	practice_button.pressed.connect(_start_race.bind("PRACTICE"))
+	hero_content.add_child(practice_button)
 	var footer := Label.new()
 	footer.text = "11 TEAMS     22 DRIVERS     %d CIRCUITS     4 CAR GENERATIONS" % TRACKS.size()
 	footer.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
@@ -293,6 +300,11 @@ func _build_menu() -> void:
 	start.custom_minimum_size = Vector2(0, 52)
 	start.pressed.connect(_start_race)
 	race_page.add_child(start)
+	var practice_start := Button.new()
+	practice_start.text = "PRACTICE RACE VS AI"
+	practice_start.custom_minimum_size = Vector2(0, 46)
+	practice_start.pressed.connect(_start_race.bind("PRACTICE"))
+	race_page.add_child(practice_start)
 	var back_race := Button.new()
 	back_race.text = "BACK TO HOME"
 	back_race.pressed.connect(func(): _set_menu_page(pages, "HOME"))
@@ -357,8 +369,15 @@ func _build_menu() -> void:
 	quality_select.select(graphics_quality)
 	quality_select.item_selected.connect(func(index: int): graphics_quality = index)
 	settings.add_child(quality_select)
+	_add_menu_label(settings, "AI DIFFICULTY")
+	var difficulty_select := OptionButton.new()
+	for difficulty_name in ["ROOKIE", "AMATEUR", "PROFESSIONAL", "EXPERT", "LEGEND"]:
+		difficulty_select.add_item(difficulty_name)
+	difficulty_select.select(ai_difficulty)
+	difficulty_select.item_selected.connect(func(index: int): ai_difficulty = index)
+	settings.add_child(difficulty_select)
 	var settings_note := Label.new()
-	settings_note.text = "Low reduces visual effects for integrated graphics. High is the default."
+	settings_note.text = "Graphics quality controls visual effects. AI difficulty changes opponent pace: Rookie is relaxed, Legend is the toughest."
 	settings_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_note.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
 	settings.add_child(settings_note)
@@ -404,9 +423,11 @@ func _add_menu_label(parent: VBoxContainer, text_value: String) -> void:
 	label.add_theme_color_override("font_color", Color(0.55, 0.72, 0.95))
 	parent.add_child(label)
 
-func _start_race() -> void:
+func _start_race(mode: String = "RACE") -> void:
 	if race_started:
 		return
+	race_mode = mode
+	race_lap_limit = 5 if race_mode == "PRACTICE" else 3
 	race_started = true
 	_apply_graphics_quality()
 	menu_layer.queue_free()
@@ -418,7 +439,7 @@ func _start_race() -> void:
 	player.controls_enabled = false
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.set_process(false)
-	race_status_label.text = "GET READY  3"
+	race_status_label.text = "PRACTICE  •  GET READY  3" if race_mode == "PRACTICE" else "GET READY  3"
 
 func _build_track(track_index: int) -> void:
 	var points: Array[Vector3] = []
@@ -665,7 +686,9 @@ func _build_ai() -> void:
 			ai.lane_offset = -5.0 + float(grid_index % 6) * 1.8
 			ai.phase = float(grid_index) / 21.0
 			ai.track_points = track_points
-			ai.speed_factor = 0.78 + float(grid_index % 7) * 0.035
+			var difficulty_multipliers := [0.72, 0.84, 0.96, 1.08, 1.20]
+			ai.speed_factor = (0.78 + float(grid_index % 7) * 0.035) * difficulty_multipliers[ai_difficulty]
+			ai.target_speed = 34.0 * difficulty_multipliers[ai_difficulty]
 			ai.track_radius = track_radius
 			add_child(ai)
 			_car_visual(ai, TEAM_COLORS[team_index], team_index, selected_car_era)
@@ -1006,7 +1029,7 @@ func _process(delta: float) -> void:
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
-			race_status_label.text = "LIGHTS OUT  •  GO!"
+			race_status_label.text = "PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"
 		return
 	elapsed += delta
 	if is_instance_valid(player):
