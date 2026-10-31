@@ -22,3 +22,10 @@ func _physics_process(delta: float) -> void:
 	velocity.z = forward.z * speed
 	velocity.y = -1.0
 	move_and_slide()
+
+func apply_collision(impact_direction: Vector3) -> void:
+	# A simple low-cost impact response: lose speed and get pushed away from the opponent.
+	speed *= 0.42
+	velocity.x += impact_direction.x * 9.0
+	velocity.z += impact_direction.z * 9.0
+	rotation.y += 0.12 * sign(impact_direction.x if abs(impact_direction.x) > 0.1 else 1.0)
