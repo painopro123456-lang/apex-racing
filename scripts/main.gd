@@ -491,6 +491,13 @@ func _add_menu_label(parent: VBoxContainer, text_value: String) -> void:
 func _start_race(mode: String = "RACE") -> void:
 	if race_started:
 		return
+	penalty_seconds = 0.0
+	track_limit_count = 0
+	track_limit_timer = 0.0
+	track_limit_outside = false
+	last_seen_collision_count = 0
+	is_dnf = false
+	dnf_reason = ""
 	race_mode = mode
 	if race_mode == "CHAMPIONSHIP":
 		selected_track = (championship_base_track + championship_round) % TRACKS.size()
@@ -1419,6 +1426,13 @@ func _finish_qualifying() -> void:
 
 func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	race_phase = "RACE"
+	penalty_seconds = 0.0
+	track_limit_count = 0
+	track_limit_timer = 0.0
+	track_limit_outside = false
+	last_seen_collision_count = int(player.collision_count)
+	is_dnf = false
+	dnf_reason = ""
 	race_lap_limit = main_race_lap_limit
 	elapsed = 0.0
 	countdown_remaining = 3.0
@@ -1610,7 +1624,7 @@ func _finish_race() -> void:
 	var result_column := VBoxContainer.new()
 	result_panel.add_child(result_column)
 	var heading := Label.new()
-	heading.text = ("CHAMPIONSHIP  •  ROUND %d COMPLETE" % (championship_round + 1)) if race_mode == "CHAMPIONSHIP" else ("PRACTICE COMPLETE" if race_mode == "PRACTICE" else "RACE COMPLETE")
+	heading.text = "RACE  •  DNF" if is_dnf else (("CHAMPIONSHIP  •  ROUND %d COMPLETE" % (championship_round + 1)) if race_mode == "CHAMPIONSHIP" else ("PRACTICE COMPLETE" if race_mode == "PRACTICE" else "RACE COMPLETE"))
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 25)
 	result_column.add_child(heading)
@@ -1703,7 +1717,8 @@ func _complete_championship() -> void:
 func _award_championship_points() -> int:
 	var entries: Array[Dictionary] = []
 	var player_name: String = DRIVERS_BY_TEAM[selected_team][selected_driver]
-	entries.append({"name": player_name, "progress": _player_progress_score()})
+	if not is_dnf:
+		entries.append({"name": player_name, "progress": _player_progress_score()})
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		entries.append({"name": opponent.driver_name, "progress": float(opponent.completed_laps * track_points.size() + opponent.progress_index)})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
