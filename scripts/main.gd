@@ -416,7 +416,7 @@ func _build_hud() -> void:
 	race_status_label.add_theme_color_override("font_color", Color(0.95, 0.78, 0.24))
 	column.add_child(race_status_label)
 	var controls := Label.new()
-	controls.text = "WASD drive  •  E ERS boost  •  Q DRS  •  3-lap race"
+	controls.text = "WASD drive  •  E ERS boost  •  SHIFT DRS  •  3-lap race"
 	controls.position = Vector2(22, 670)
 	layer.add_child(controls)
 
