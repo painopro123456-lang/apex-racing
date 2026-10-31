@@ -55,6 +55,7 @@ var selected_track := 0
 var selected_car_era := 0
 var ai_difficulty := 2
 var race_mode := "RACE"
+var championship_active := false
 var championship_round := 0
 var championship_rounds := 5
 var championship_base_track := 0
@@ -89,6 +90,8 @@ func _ready() -> void:
 	_load_championship()
 	_build_environment()
 	_build_menu()
+	if championship_active:
+		call_deferred("_resume_championship")
 
 func _build_environment() -> void:
 	var env_node := WorldEnvironment.new()
@@ -1217,6 +1220,7 @@ func _finish_race() -> void:
 		result_column.add_child(close_button)
 
 func _start_championship() -> void:
+	championship_active = true
 	championship_round = 0
 	championship_base_track = selected_track
 	championship_standings.clear()
@@ -1228,7 +1232,11 @@ func _advance_championship() -> void:
 	_save_championship()
 	get_tree().reload_current_scene()
 
+func _resume_championship() -> void:
+	_start_race("CHAMPIONSHIP")
+
 func _complete_championship() -> void:
+	championship_active = false
 	championship_round = 0
 	championship_standings.clear()
 	_save_championship()
@@ -1267,7 +1275,13 @@ func _championship_standings_text() -> String:
 
 func _save_championship() -> void:
 	var config := ConfigFile.new()
+	config.set_value("season", "active", championship_active)
 	config.set_value("season", "round", championship_round)
+	config.set_value("season", "team", selected_team)
+	config.set_value("season", "driver", selected_driver)
+	config.set_value("season", "car_era", selected_car_era)
+	config.set_value("season", "difficulty", ai_difficulty)
+	config.set_value("season", "tyre", selected_tyre_compound)
 	config.set_value("season", "base_track", championship_base_track)
 	config.set_value("season", "standings", championship_standings)
 	config.save(CHAMPIONSHIP_SAVE_PATH)
@@ -1276,6 +1290,12 @@ func _load_championship() -> void:
 	var config := ConfigFile.new()
 	if config.load(CHAMPIONSHIP_SAVE_PATH) != OK:
 		return
+	championship_active = bool(config.get_value("season", "active", false))
 	championship_round = int(config.get_value("season", "round", 0))
+	selected_team = clampi(int(config.get_value("season", "team", selected_team)), 0, TEAM_NAMES.size() - 1)
+	selected_driver = clampi(int(config.get_value("season", "driver", selected_driver)), 0, DRIVERS_BY_TEAM[selected_team].size() - 1)
+	selected_car_era = clampi(int(config.get_value("season", "car_era", selected_car_era)), 0, CAR_ERAS.size() - 1)
+	ai_difficulty = clampi(int(config.get_value("season", "difficulty", ai_difficulty)), 0, 4)
+	selected_tyre_compound = str(config.get_value("season", "tyre", selected_tyre_compound))
 	championship_base_track = int(config.get_value("season", "base_track", 0))
 	championship_standings = config.get_value("season", "standings", {})
