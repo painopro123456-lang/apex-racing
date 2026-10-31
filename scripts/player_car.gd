@@ -105,9 +105,14 @@ func _physics_process(delta: float) -> void:
 		tyre_wear = max(0.0, tyre_wear - abs(forward_speed) * delta * wear_rate)
 	move_and_slide()
 	if get_slide_collision_count() > 0 and collision_cooldown <= 0.0 and abs(forward_speed) > 4.0:
-		var impact_collision := get_slide_collision(0)
-		apply_collision(impact_collision.get_normal())
-		collision_cooldown = 0.65
+		for collision_index in range(get_slide_collision_count()):
+			var impact_collision := get_slide_collision(collision_index)
+			var impact_normal: Vector3 = impact_collision.get_normal()
+			# Ignore the road surface; only side impacts against barriers count.
+			if abs(impact_normal.y) < 0.65:
+				apply_collision(impact_normal)
+				collision_cooldown = 0.65
+				break
 
 func _brake_effectiveness() -> float:
 	# A little more front bias improves stability under braking; excessive bias costs stopping performance.
