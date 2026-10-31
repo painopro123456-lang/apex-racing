@@ -513,6 +513,9 @@ func _start_race(mode: String = "RACE") -> void:
 	qualifying_lap_start_time = 0.0
 	qualifying_grid_position = 1
 	race_started = true
+	yellow_flag_timer = 0.0
+	if is_instance_valid(race_flag_label):
+		race_flag_label.text = "GREEN FLAG"
 	_apply_graphics_quality()
 	menu_layer.queue_free()
 	_build_track(selected_track)
@@ -1486,6 +1489,29 @@ func _begin_formation_lap(ai_times: Array[Dictionary]) -> void:
 	race_active = false
 	player.max_speed = 30.0
 	player.controls_enabled = false
+	var grid_position := 1
+	for entry in ai_times:
+		var opponent = entry["car"]
+		if grid_position == qualifying_grid_position:
+			grid_position += 1
+		opponent.reset_to_grid(grid_position)
+		grid_position += 1
+	if qualifying_grid_position == 1:
+		player.global_position = _track_lane_point(0, 2.1)
+		player_last_track_index = 0
+	else:
+		var row := int((qualifying_grid_position - 2) / 2) + 1
+		var phase := fposmod(1.0 - float(row * 4) / float(track_points.size()), 1.0)
+		var row_start := int(phase * track_points.size()) % track_points.size()
+		var start_index := (row_start + (1 if qualifying_grid_position % 2 == 0 else 0)) % track_points.size()
+		var lane := -2.1 if qualifying_grid_position % 2 == 0 else 2.1
+		player.global_position = _track_lane_point(start_index, lane)
+		player_last_track_index = start_index
+	player_laps = 0
+	var grid_previous: Vector3 = track_points[(player_last_track_index - 1 + track_points.size()) % track_points.size()]
+	var grid_next: Vector3 = track_points[(player_last_track_index + 1) % track_points.size()]
+	var grid_tangent := (grid_next - grid_previous).normalized()
+	player.rotation.y = atan2(-grid_tangent.x, -grid_tangent.z)
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.formation_mode = true
 		opponent.set_process(false)
