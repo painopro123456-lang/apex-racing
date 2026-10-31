@@ -125,7 +125,7 @@ const TRACK_SETUP_PRESETS := {
 var race_started := false
 var countdown_remaining := 3.0
 var start_light_stage := 0
-var start_light_nodes: Array[ColorRect] = []
+var start_light_nodes: Array[Panel] = []
 var race_active := false
 var race_finished := false
 var player_laps := 0
@@ -1305,11 +1305,10 @@ func _build_hud() -> void:
 	gantry.add_child(gantry_row)
 	start_light_nodes.clear()
 	for light_index in range(5):
-		var lamp := ColorRect.new()
+		var lamp := Panel.new()
 		lamp.custom_minimum_size = Vector2(27, 27)
-		lamp.color = Color(0.12, 0.015, 0.02)
 		var lamp_style := StyleBoxFlat.new()
-		lamp_style.bg_color = lamp.color
+		lamp_style.bg_color = Color(0.12, 0.015, 0.02)
 		lamp_style.corner_radius_top_left = 14
 		lamp_style.corner_radius_top_right = 14
 		lamp_style.corner_radius_bottom_left = 14
@@ -1342,11 +1341,10 @@ func _build_hud() -> void:
 
 func _update_start_lights(stage: int) -> void:
 	for i in range(start_light_nodes.size()):
-		var lamp: ColorRect = start_light_nodes[i]
+		var lamp: Panel = start_light_nodes[i]
 		var active: bool = stage > 0 and i < stage
-		lamp.color = Color(0.95, 0.015, 0.025) if active else Color(0.12, 0.015, 0.02)
 		var style := StyleBoxFlat.new()
-		style.bg_color = lamp.color
+		style.bg_color = Color(0.95, 0.015, 0.025) if active else Color(0.12, 0.015, 0.02)
 		style.corner_radius_top_left = 14
 		style.corner_radius_top_right = 14
 		style.corner_radius_bottom_left = 14
@@ -1394,7 +1392,7 @@ func _process(delta: float) -> void:
 				if next_stage != start_light_stage:
 					start_light_stage = next_stage
 					_update_start_lights(start_light_stage)
-			var countdown_text := "RACE  •  %d" % int(ceil(countdown_remaining))
+			var countdown_text := "START SEQUENCE" if race_phase == "RACE" else "RACE  •  %d" % int(ceil(countdown_remaining))
 			if race_phase == "FORMATION":
 				countdown_text = "FORMATION LAP  •  %d" % int(ceil(countdown_remaining))
 			elif race_phase == "QUALIFYING":
@@ -1418,7 +1416,7 @@ func _process(delta: float) -> void:
 			elif race_mode == "PRACTICE":
 				race_status_label.text = "PRACTICE  •  GO!"
 			else:
-				race_status_label.text = "LIGHTS OUT" if race_phase == "RACE" else "GO!"
+				race_status_label.text = "LIGHTS OUT  •  GO!" if race_phase == "RACE" else "GO!"
 		return
 	elapsed += delta
 	if is_instance_valid(player):
