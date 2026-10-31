@@ -285,13 +285,13 @@ func _build_menu() -> void:
 	race_title.text = "RACE WEEKEND"
 	race_title.add_theme_font_size_override("font_size", 27)
 	race_page.add_child(race_title)
-	_add_menu_label(race_page, "CIRCUIT")
 	_add_menu_label(race_page, "DRIVER")
 	var race_driver_select := OptionButton.new()
 	race_driver_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_populate_driver_select(race_driver_select)
 	race_driver_select.item_selected.connect(func(index: int): selected_driver = index)
 	race_page.add_child(race_driver_select)
+	_add_menu_label(race_page, "CIRCUIT")
 	var track_select := OptionButton.new()
 	track_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for track in TRACKS:
@@ -725,8 +725,9 @@ func _build_ai() -> void:
 			ai.phase = fposmod(1.0 - float(grid_row * 2) / float(track_points.size()), 1.0)
 			ai.track_points = track_points
 			var difficulty_multipliers := [0.72, 0.84, 0.96, 1.08, 1.20]
-			ai.speed_factor = (0.78 + float(grid_index % 7) * 0.035) * difficulty_multipliers[ai_difficulty]
-			ai.target_speed = 34.0 * difficulty_multipliers[ai_difficulty]
+			# Keep driver-to-driver pace variation small; difficulty controls the field's base pace.
+			ai.speed_factor = 0.94 + float(grid_index % 7) * 0.01
+			ai.target_speed = 66.0 * difficulty_multipliers[ai_difficulty]
 			ai.track_radius = track_radius
 			add_child(ai)
 			_car_visual(ai, TEAM_COLORS[team_index], team_index, selected_car_era)
@@ -1061,7 +1062,8 @@ func _process(delta: float) -> void:
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
-			race_status_label.text = "GET READY  %d" % int(ceil(countdown_remaining))
+			var countdown_text := "CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "GET READY  %d" % int(ceil(countdown_remaining)))
+			race_status_label.text = countdown_text
 		else:
 			race_active = true
 			player.controls_enabled = true
