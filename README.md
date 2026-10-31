@@ -1,21 +1,31 @@
 # Apex Racing
 
-A Godot 4 project for a personal 3D formula-style racing game.
+A personal 3D formula-style racing game built with Godot 4.
 
-## Current baseline
-This repository starts from the recovered Apex Racing prototype. It contains a dark navy/blue selection menu, selectable fictional teams and drivers, three procedural test circuits, a basic player car, and simple AI traffic.
+## Windows download
 
-## Run
-1. Install Godot 4.x.
-2. Clone this repository and open `project.godot`.
-3. Press Play.
-4. Select a team, driver, and circuit, then start the race.
-5. Drive with WASD or arrow keys.
+The repository automatically builds a **Windows `.exe`** whenever changes are pushed to `main`, and when a workflow is manually started.
 
-## Current limitations
-This is an early playable prototype, not a finished F1-scale game. The teams and drivers are fictional placeholders. The three circuits are procedural test layouts, not accurate recreations of real tracks. Cars use primitive geometry; handling, AI, race rules, pit stops, tyre/fuel simulation, weather, damage, career/championship modes, and save data are not implemented yet.
+- **Latest Windows executable:** open [GitHub Releases](https://github.com/painopro123456-lang/apex-racing/releases/latest) and download `ApexRacing.exe`.
+- **Build artifacts:** open [Actions](https://github.com/painopro123456-lang/apex-racing/actions), choose a successful run, and download `Apex-Racing-Windows`.
 
-The project uses Godot's Compatibility renderer as a low-end-friendly starting point. Performance on integrated graphics and 4 GB RAM has not yet been measured or guaranteed.
+No Android or iOS targets are planned. Windows is the only target platform.
+
+## Run from source
+
+1. Install Godot 4.4.1.
+2. Clone or download this repository.
+3. Open `project.godot` in Godot.
+4. Press Play.
+
+## Current prototype
+
+The current baseline includes a dark navy/blue selection menu, selectable fictional teams and drivers, three procedural test circuits, a basic player car, and simple AI cars.
+
+This is an early playable prototype, not a finished F1-scale game. Teams and drivers are fictional placeholders. The circuits are procedural test layouts, not accurate recreations of real tracks. Cars use primitive geometry. Advanced handling, competitive AI, race rules, pit stops, tyre/fuel simulation, weather, damage, career/championship modes, and save data are not implemented yet.
+
+The project uses Godot's Compatibility renderer as a low-end-friendly starting point. Performance has not yet been measured or guaranteed.
 
 ## Development direction
-Keep the existing visual identity and expand the prototype incrementally: improve vehicle physics and AI, build distinct circuit layouts, then add race-weekend systems, game modes, content data, and optimized assets. Any real-world team branding, driver likenesses, or official liveries must be handled with appropriate permissions.
+
+Keep the existing visual identity and expand incrementally: improve vehicle physics and AI, build distinct circuit layouts, then add race-weekend systems, game modes, content data, and optimized assets. Any real-world team branding, driver likenesses, or official liveries must be handled with appropriate permissions.
