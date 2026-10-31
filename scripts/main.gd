@@ -33,7 +33,7 @@ const DRIVER_NUMBERS_BY_TEAM := [
 ]
 const CAR_ERAS := ["2026 Ground Effect", "2010s V8 Hybrid", "2000s V10", "1990s V12 Classic"]
 # Official-style Grand Prix race distances for the named venues; prototype tracks use shorter custom events.
-const TRACK_LAPS := [20, 25, 30, 78, 52, 53, 44, 53, 57, 62, 58, 71, 72, 63, 66]
+const TRACK_LAPS := [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
 const ERA_CAR_STATS := [
 	{"horsepower": 1000, "max_speed": 355.0, "handling": 94, "zero_to_100": 2.5},
 	{"horsepower": 900, "max_speed": 350.0, "handling": 91, "zero_to_100": 2.6},
@@ -543,7 +543,7 @@ func _start_race(mode: String = "RACE") -> void:
 	race_mode = mode
 	if race_mode == "CHAMPIONSHIP":
 		selected_track = (championship_base_track + championship_round) % TRACKS.size()
-	main_race_lap_limit = 5 if race_mode == "PRACTICE" else 8
+	main_race_lap_limit = 5 if race_mode == "PRACTICE" else TRACK_LAPS[selected_track]
 	race_lap_limit = 2
 	race_phase = "QUALIFYING"
 	qualifying_best_lap = INF
@@ -1588,7 +1588,8 @@ func _complete_formation_lap() -> void:
 
 func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	race_phase = "RACE"
-	_apply_car_performance()\n\tpenalty_seconds = 0.0
+	_apply_car_performance()
+	penalty_seconds = 0.0
 	track_limit_count = 0
 	track_limit_timer = 0.0
 	track_limit_outside = false
