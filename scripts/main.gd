@@ -225,6 +225,13 @@ func _road_piece(p1: Vector3, p2: Vector3, width: float, mat: Material) -> void:
 func _build_player() -> void:
 	player = CharacterBody3D.new()
 	player.set_script(PLAYER_SCRIPT)
+	player.collision_layer = 1
+	player.collision_mask = 0
+	var player_hitbox := CollisionShape3D.new()
+	var player_shape := BoxShape3D.new()
+	player_shape.size = Vector3(1.8, 1.0, 4.0)
+	player_hitbox.shape = player_shape
+	player.add_child(player_hitbox)
 	player.position = Vector3(0, 0.45, -track_radius + 7)
 	player.rotation.y = PI
 	add_child(player)
