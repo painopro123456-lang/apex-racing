@@ -55,7 +55,8 @@ func reset_to_grid(grid_position: int) -> void:
 	else:
 		var row := int((grid_position - 2) / 2) + 1
 		phase = fposmod(1.0 - float(row * 4) / float(track_points.size()), 1.0)
-		progress_index = int(phase * track_points.size()) % track_points.size()
+		var row_start := int(phase * track_points.size()) % track_points.size()
+		progress_index = (row_start + (1 if grid_position % 2 == 0 else 0)) % track_points.size()
 		completed_laps = -1
 		lane_offset = -2.1 if grid_position % 2 == 0 else 2.1
 	base_lane = lane_offset
