@@ -418,7 +418,7 @@ func _process(delta: float) -> void:
 		return
 	elapsed += delta
 	if is_instance_valid(player):
-		speed_label.text = "Speed  %03d km/h\\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
+		speed_label.text = "Speed  %03d km/h\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
 		var progress := _player_progress_score()
 		var position := _get_player_position(progress)
@@ -479,7 +479,7 @@ func _finish_race() -> void:
 	heading.add_theme_font_size_override("font_size", 28)
 	result_column.add_child(heading)
 	var result := Label.new()
-	result.text = "%s finishes P%d\\n3 laps  •  %s\\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], _get_player_position(_player_progress_score()), TRACKS[selected_track], elapsed]
+	result.text = "%s finishes P%d\n3 laps  •  %s\nRace time: %05.1f s" % [DRIVERS_BY_TEAM[selected_team][selected_driver], _get_player_position(_player_progress_score()), TRACKS[selected_track], elapsed]
 	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_column.add_child(result)
 	var close_button := Button.new()
