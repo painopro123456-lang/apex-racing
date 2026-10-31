@@ -420,7 +420,7 @@ func _build_player() -> void:
 	player.position = Vector3(0, 0.45, -track_radius + 7)
 	player.rotation.y = PI
 	add_child(player)
-	_car_visual(player, TEAM_COLORS[selected_team])
+	_car_visual(player, TEAM_COLORS[selected_team], selected_team)
 	var camera := Camera3D.new()
 	camera.position = Vector3(0, 4.8, 10.5)
 	camera.rotation_degrees = Vector3(-18, 0, 0)
@@ -443,10 +443,24 @@ func _build_ai() -> void:
 			ai.speed_factor = 0.78 + float(grid_index % 7) * 0.035
 			ai.track_radius = track_radius
 			add_child(ai)
-			_car_visual(ai, TEAM_COLORS[team_index])
+			_car_visual(ai, TEAM_COLORS[team_index], team_index)
 			grid_index += 1
 
-func _car_visual(parent: Node3D, color: Color) -> void:
+const TEAM_SPONSORS := [
+	["MASTERCARD", "GOOGLE", "DELL", "OKX"],
+	["PETRONAS", "INEOS", "CROWDSTRIKE", "UBS"],
+	["ORACLE", "HONDA", "MOBIL 1", "RAUCH"],
+	["HP", "SHELL", "PIRELLI", "IBM"],
+	["ATLASSIAN", "DURACELL", "GULF", "KOMATSU"],
+	["VISA", "CASH APP", "HUGO", "RAY-BAN"],
+	["ARAMCO", "CITIZEN", "COGNIZANT", "PERONI"],
+	["TOYOTA", "GR", "MoneyGram", "GENE HAAS"],
+	["REVOLUT", "BP", "CASTROL", "ADIDAS"],
+	["BWT", "MOTOROLA", "MICHELIN", "ALPINE"],
+	["TWG", "GM", "CHEVROLET", "TOMMY HILFIGER"]
+]
+
+func _car_visual(parent: Node3D, color: Color, team_index: int) -> void:
 	# Lightweight low-poly open-wheel car: nose, sidepods, cockpit, halo, wings and tyres.
 	var carbon := Color(0.018, 0.022, 0.03)
 	var tyre := Color(0.012, 0.014, 0.018)
