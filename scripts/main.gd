@@ -1126,6 +1126,8 @@ func _process(delta: float) -> void:
 		return
 	if Input.is_action_just_pressed("pit_request") and race_active:
 		_open_pit_strategy("Your request")
+	if race_phase == "QUALIFYING_RESULTS":
+		return
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
@@ -1282,6 +1284,7 @@ func _track_lane_point(index: int, offset: float) -> Vector3:
 func _finish_qualifying() -> void:
 	if race_phase != "QUALIFYING":
 		return
+	race_phase = "QUALIFYING_RESULTS"
 	race_active = false
 	player.controls_enabled = false
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
