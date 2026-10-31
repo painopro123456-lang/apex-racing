@@ -1436,7 +1436,7 @@ func _process(delta: float) -> void:
 		_update_leaderboard()
 		var current_track_index: int = max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
-		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
+		tyre_label.text = ("PUNCTURE  •  BOX NOW" if player.tyre_punctured else "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)])
 		systems_label.text = "DAMAGE %02d%%  •  ERS %02d%%" % [int(player.damage), int(player.ers_charge)]
 		if is_instance_valid(race_control_label):
 			race_control_label.text = "RACE CONTROL  •  PENALTIES %.0fs  •  LIMITS %d" % [penalty_seconds, track_limit_count]
@@ -1801,6 +1801,7 @@ func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	qualifying_lap_start_time = 0.0
 	player.tyre_compound = selected_tyre_compound
 	player.tyre_wear = 100.0
+	player.tyre_punctured = false
 	player.ers_charge = 100.0
 	player.damage = 0.0
 	player.velocity = Vector3.ZERO
