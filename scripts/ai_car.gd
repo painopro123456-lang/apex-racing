@@ -10,6 +10,7 @@ var driver_name := "AI Driver"
 var driver_number := "0"
 var collision_area: Area3D
 var progress_index := 0
+var completed_laps := 0
 var current_speed := 0.0
 var target_speed := 34.0
 var base_lane := 0.0
@@ -79,6 +80,8 @@ func _advance_progress() -> void:
 	var next_index := (progress_index + 1) % track_points.size()
 	var next_point: Vector3 = track_points[next_index]
 	if global_position.distance_squared_to(next_point) < 13.0:
+		if next_index == 0:
+			completed_laps += 1
 		progress_index = next_index
 
 func _find_nearby_opponent() -> float:
