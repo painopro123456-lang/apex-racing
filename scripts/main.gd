@@ -1718,7 +1718,8 @@ func _award_championship_points() -> int:
 	var entries: Array[Dictionary] = []
 	var player_name: String = DRIVERS_BY_TEAM[selected_team][selected_driver]
 	if not is_dnf:
-		entries.append({"name": player_name, "progress": _player_progress_score()})
+		var penalty_progress := penalty_seconds * 35.0 * float(track_points.size()) / _track_length()
+		entries.append({"name": player_name, "progress": _player_progress_score() - penalty_progress})
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		entries.append({"name": opponent.driver_name, "progress": float(opponent.completed_laps * track_points.size() + opponent.progress_index)})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
