@@ -726,7 +726,7 @@ func _build_ai() -> void:
 			var grid_row := int(grid_index / 2) + 1
 			ai.lane_offset = -2.1 if grid_index % 2 == 0 else 2.1
 			# Two-wide starting rows placed just behind the start/finish line.
-			ai.phase = fposmod(1.0 - float(grid_row * 2) / float(track_points.size()), 1.0)
+			ai.phase = fposmod(1.0 - float(grid_row * 4) / float(track_points.size()), 1.0)
 			ai.track_points = track_points
 			var difficulty_multipliers := [0.72, 0.84, 0.96, 1.08, 1.20]
 			# Keep driver-to-driver pace variation small; difficulty controls the field's base pace.
