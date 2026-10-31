@@ -197,7 +197,7 @@ func _build_menu() -> void:
 	quality_select.item_selected.connect(func(index: int): graphics_quality = index)
 	column.add_child(quality_select)
 	var info := Label.new()
-	info.text = "11 real 2026 teams  •  22 drivers  •  3 circuits  •  22-car grid"
+	info.text = "11 teams  •  22 drivers  •  %d circuits  •  22-car grid" % TRACKS.size()
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88))
 	column.add_child(info)
@@ -458,8 +458,17 @@ func _build_player() -> void:
 	player_shape.size = Vector3(1.8, 1.0, 4.0)
 	player_hitbox.shape = player_shape
 	player.add_child(player_hitbox)
-	player.position = Vector3(0, 0.45, -track_radius + 7)
-	player.rotation.y = PI
+	# Place the player on the selected circuit's actual start/finish waypoint.
+	# This keeps the grid aligned on non-circular layouts as well as the original tracks.
+	if track_points.size() >= 3:
+		var start_point: Vector3 = track_points[0]
+		var start_tangent := (track_points[1] - track_points[track_points.size() - 1]).normalized()
+		var start_lateral := Vector3(-start_tangent.z, 0.0, start_tangent.x)
+		player.position = start_point + start_lateral * 3.0 + Vector3.UP * 0.45
+		player.rotation.y = atan2(-start_tangent.x, -start_tangent.z)
+	else:
+		player.position = Vector3(0, 0.45, -track_radius + 7)
+		player.rotation.y = PI
 	add_child(player)
 	_car_visual(player, TEAM_COLORS[selected_team], selected_team)
 	var camera := Camera3D.new()
