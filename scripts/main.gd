@@ -475,6 +475,27 @@ func _car_visual(parent: Node3D, color: Color) -> void:
 		for z in [-1.65, 1.35]:
 			_add_car_cylinder(parent, 0.48, 0.34, Vector3(x, 0.34, z), tyre)
 			_add_car_cylinder(parent, 0.22, 0.355, Vector3(x * 1.01, 0.34, z), rim)
+	# Small layered details add visual depth without expensive materials or textures.
+	var accent := color.lightened(0.28)
+	var dark_trim := Color(0.025, 0.032, 0.043)
+	# Nose centre stripe and front-wing endplate accents.
+	_add_car_box(parent, Vector3(0.075, 0.035, 1.45), Vector3(0, 0.485, -1.72), accent)
+	for x in [-1.08, 1.08]:
+		_add_car_box(parent, Vector3(0.09, 0.3, 0.42), Vector3(x, 0.36, -2.72), accent)
+	# Sidepod upper trim and dark lower floor.
+	for x in [-0.72, 0.72]:
+		_add_car_box(parent, Vector3(0.48, 0.045, 1.12), Vector3(x, 0.605, 0.12), accent)
+		_add_car_box(parent, Vector3(0.62, 0.08, 1.58), Vector3(x, 0.16, 0.18), dark_trim)
+	# Engine cover spine, cockpit dashboard and rear diffuser.
+	_add_car_box(parent, Vector3(0.16, 0.12, 1.1), Vector3(0, 0.66, 0.58), accent)
+	_add_car_box(parent, Vector3(0.42, 0.045, 0.24), Vector3(0, 0.77, -0.42), rim)
+	_add_car_box(parent, Vector3(1.35, 0.12, 0.38), Vector3(0, 0.12, 2.0), dark_trim)
+	# Rear wing endplates and subtle tyre sidewall bands.
+	for x in [-0.98, 0.98]:
+		_add_car_box(parent, Vector3(0.075, 0.55, 0.42), Vector3(x, 0.91, 1.72), accent)
+	for x in [-0.98, 0.98]:
+		for z in [-1.65, 1.35]:
+			_add_car_cylinder(parent, 0.245, 0.358, Vector3(x * 1.01, 0.34, z), dark_trim)
 
 func _add_car_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, color: Color) -> void:
 	var node := MeshInstance3D.new()
