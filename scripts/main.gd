@@ -344,7 +344,7 @@ func _build_menu() -> void:
 	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
 	race_page.add_child(tyre_select)
 	var race_summary := Label.new()
-	race_summary.text = "3-LAP RACE   •   22-CAR GRID   •   AI OPPONENTS"
+	race_summary.text = "2-LAP QUALIFYING  +  3-LAP RACE   •   22-CAR GRID"
 	race_summary.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
 	race_page.add_child(race_summary)
 	var start := Button.new()
@@ -1056,8 +1056,29 @@ func _build_hud() -> void:
 	status_col.add_child(drs_label)
 	tyre_label = _hud_label("TYRE  MEDIUM  •  100%", 13, Color.WHITE)
 	status_col.add_child(tyre_label)
-	systems_label = _hud_label("FUEL  100%", 13, Color(0.78, 0.84, 0.9))
+	systems_label = _hud_label("FUEL  100%  •  DAMAGE 00%", 13, Color(0.78, 0.84, 0.9))
 	status_col.add_child(systems_label)
+	setup_label = _hud_label("SETUP  •  BB 56%  AERO 22  FW 18  RW 22", 10, Color(0.65, 0.75, 0.87))
+	status_col.add_child(setup_label)
+
+	var engineer_panel := PanelContainer.new()
+	engineer_panel.anchor_left = 1.0
+	engineer_panel.anchor_right = 1.0
+	engineer_panel.offset_left = -260
+	engineer_panel.offset_right = -24
+	engineer_panel.offset_top = 265
+	engineer_panel.offset_bottom = 385
+	engineer_panel.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.92), Color(0.25, 0.72, 0.95, 0.9)))
+	root.add_child(engineer_panel)
+	var engineer_col := VBoxContainer.new()
+	engineer_col.add_theme_constant_override("separation", 5)
+	engineer_panel.add_child(engineer_col)
+	engineer_col.add_child(_hud_label("RACE ENGINEER  /  RADIO", 11, Color(0.55, 0.78, 0.94)))
+	gap_label = _hud_label("GAP BEHIND  --", 12, Color.WHITE)
+	engineer_col.add_child(gap_label)
+	engineer_label = _hud_label(engineer_message, 12, Color(0.9, 0.93, 0.97))
+	engineer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	engineer_col.add_child(engineer_label)
 
 	race_status_label = _hud_label("GET READY", 24, Color(0.98, 0.78, 0.25))
 	race_status_label.anchor_left = 0.5
@@ -1069,7 +1090,7 @@ func _build_hud() -> void:
 	race_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(race_status_label)
 
-	var controls := _hud_label("WASD DRIVE     E ERS     SHIFT DRS", 11, Color(0.72, 0.8, 0.88))
+	var controls := _hud_label("WASD DRIVE     E ERS     SHIFT DRS     P PIT", 11, Color(0.72, 0.8, 0.88))
 	controls.anchor_left = 0.5
 	controls.anchor_right = 0.5
 	controls.anchor_top = 1.0
@@ -1216,6 +1237,11 @@ func _update_player_lap() -> void:
 		var count := track_points.size()
 		if player_last_track_index > int(count * 0.8) and current_index < int(count * 0.2):
 			player_laps += 1
+			if race_phase == "QUALIFYING":
+				var lap_time := elapsed - qualifying_lap_start_time
+				if lap_time > 0.1:
+					qualifying_best_lap = min(qualifying_best_lap, lap_time)
+				qualifying_lap_start_time = elapsed
 	player_last_track_index = current_index
 
 func _player_progress_score() -> float:
@@ -1228,6 +1254,246 @@ func _get_player_position(player_progress: float) -> int:
 		if score > player_progress:
 			ahead += 1
 	return ahead + 1
+
+func _track_length() -> float:
+	var total := 0.0
+	for i in range(track_points.size()):
+		total += track_points[i].distance_to(track_points[(i + 1) % track_points.size()])
+	return max(total, 1.0)
+
+func _apply_track_setup() -> void:
+	track_setup = TRACK_SETUP_PRESETS.get(TRACKS[selected_track], TRACK_SETUP_PRESETS["Desert Ring"]).duplicate(true)
+	if is_instance_valid(player):
+		player.brake_bias = float(track_setup["brake_bias"])
+		player.aero_level = float(track_setup["aero"])
+		player.front_wing = float(track_setup["front_wing"])
+		player.rear_wing = float(track_setup["rear_wing"])
+
+func _track_lane_point(index: int, offset: float) -> Vector3:
+	var count := track_points.size()
+	var centre: Vector3 = track_points[index % count]
+	var previous: Vector3 = track_points[(index - 1 + count) % count]
+	var next_point: Vector3 = track_points[(index + 1) % count]
+	var tangent := (next_point - previous).normalized()
+	return centre + Vector3(-tangent.z, 0.0, tangent.x) * offset + Vector3.UP * 0.45
+
+func _finish_qualifying() -> void:
+	if race_phase != "QUALIFYING":
+		return
+	race_active = false
+	player.controls_enabled = false
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		opponent.set_process(false)
+	var ai_times: Array[Dictionary] = []
+	var circuit_length := _track_length()
+	var ai_index := 0
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		var variation := 1.38 + float(ai_index % 7) * 0.045
+		var simulated_time := circuit_length / max(opponent.target_speed * opponent.speed_factor, 12.0) * variation
+		ai_times.append({"car": opponent, "time": simulated_time})
+		ai_index += 1
+	ai_times.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["time"]) < float(b["time"])
+	)
+	qualifying_grid_position = 1
+	for entry in ai_times:
+		if float(entry["time"]) < qualifying_best_lap:
+			qualifying_grid_position += 1
+	var result_layer := CanvasLayer.new()
+	add_child(result_layer)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-245, -135)
+	panel.custom_minimum_size = Vector2(490, 270)
+	result_layer.add_child(panel)
+	var column := VBoxContainer.new()
+	panel.add_child(column)
+	var heading := _hud_label("QUALIFYING COMPLETE", 24, Color(0.35, 0.82, 1.0))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(heading)
+	var timing := _hud_label("BEST LAP  %s\\nSTARTING POSITION  P%02d" % [_format_sector_time(qualifying_best_lap if qualifying_best_lap < INF else elapsed), qualifying_grid_position], 18, Color.WHITE)
+	timing.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(timing)
+	var note := _hud_label("Your two timed laps are complete. The grid is set from qualifying pace.", 12, Color(0.68, 0.77, 0.88))
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(note)
+	var start_button := Button.new()
+	start_button.text = "START GRAND PRIX"
+	start_button.custom_minimum_size = Vector2(0, 46)
+	start_button.pressed.connect(func():
+		result_layer.queue_free()
+		_begin_main_race(ai_times)
+	)
+	column.add_child(start_button)
+	engineer_message = "Good job. P%d on the grid. Confirm your race tyres, then we go." % qualifying_grid_position
+	engineer_label.text = engineer_message
+
+func _begin_main_race(ai_times: Array[Dictionary]) -> void:
+	race_phase = "RACE"
+	race_lap_limit = main_race_lap_limit
+	elapsed = 0.0
+	countdown_remaining = 3.0
+	race_active = false
+	player_laps = 0
+	player_last_track_index = 0
+	sector_current = 1
+	sector_elapsed = 0.0
+	sector_last_index = -1
+	sector_times = [0.0, 0.0, 0.0]
+	qualifying_lap_start_time = 0.0
+	player.tyre_compound = selected_tyre_compound
+	player.tyre_wear = 100.0
+	player.fuel_remaining = 100.0
+	player.ers_charge = 100.0
+	player.damage = 0.0
+	player.velocity = Vector3.ZERO
+	player.speed = 0.0
+	# Sort and place the 21 AI cars around the player's qualifying position.
+	var grid_position := 1
+	for entry in ai_times:
+		var opponent = entry["car"]
+		if grid_position == qualifying_grid_position:
+			grid_position += 1
+		opponent.reset_to_grid(grid_position)
+		grid_position += 1
+	if qualifying_grid_position == 1:
+		player.global_position = _track_lane_point(0, 2.1)
+		player_laps = 0
+		player_last_track_index = 0
+	else:
+		var row := int((qualifying_grid_position - 2) / 2) + 1
+		var phase := fposmod(1.0 - float(row * 4) / float(track_points.size()), 1.0)
+		var start_index := int(phase * track_points.size()) % track_points.size()
+		var lane := -2.1 if qualifying_grid_position % 2 == 0 else 2.1
+		player.global_position = _track_lane_point(start_index, lane)
+		player_laps = -1
+		player_last_track_index = start_index
+	var previous: Vector3 = track_points[(max(player_last_track_index, 0) - 1 + track_points.size()) % track_points.size()]
+	var next_point: Vector3 = track_points[(max(player_last_track_index, 0) + 1) % track_points.size()]
+	var tangent := (next_point - previous).normalized()
+	player.rotation.y = atan2(-tangent.x, -tangent.z)
+	player.controls_enabled = false
+	last_reported_position = qualifying_grid_position
+	pit_alert_damage = false
+	pit_alert_tyres = false
+	pit_alert_fuel = false
+	engineer_message = "Race start in three. You are P%d. Watch the car behind." % qualifying_grid_position
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+	lap_label.text = "LAP  1 / %d" % race_lap_limit
+	position_label.text = "P %02d" % qualifying_grid_position
+	race_status_label.text = "GRID  •  P%02d  •  LIGHTS IN 3" % qualifying_grid_position
+
+func _gap_to_car_behind() -> Dictionary:
+	var player_score := _player_progress_score()
+	var closest: Node3D = null
+	var closest_score := -INF
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		var score := float(opponent.completed_laps * track_points.size() + opponent.progress_index)
+		if score < player_score and score > closest_score:
+			closest_score = score
+			closest = opponent
+	if closest == null:
+		return {"name": "NONE", "gap": -1.0}
+	var points_behind := player_score - closest_score
+	var average_segment := _track_length() / max(track_points.size(), 1)
+	var average_speed := max((abs(player.speed) + float(closest.current_speed)) * 0.5, 12.0)
+	return {"name": closest.driver_name, "gap": points_behind * average_segment / average_speed}
+
+func _update_engineer(delta: float) -> void:
+	engineer_cooldown = max(0.0, engineer_cooldown - delta)
+	var behind := _gap_to_car_behind()
+	if float(behind["gap"]) >= 0.0:
+		gap_label.text = "GAP TO %s  +%.1fs" % [str(behind["name"]).to_upper(), float(behind["gap"])]
+	else:
+		gap_label.text = "GAP BEHIND  NO CAR"
+	var current_position := _get_player_position(_player_progress_score())
+	if current_position > last_reported_position and engineer_cooldown <= 0.0:
+		engineer_message = "We've lost a place. Box this lap? Choose a compound if you want to react."
+		engineer_cooldown = 12.0
+		last_reported_position = current_position
+		_open_pit_strategy("Position change")
+	elif current_position < last_reported_position and engineer_cooldown <= 0.0:
+		engineer_message = "Great move. You're up to P%d. Keep pushing." % current_position
+		engineer_cooldown = 8.0
+		last_reported_position = current_position
+	if player.damage >= 25.0 and not pit_alert_damage and not pit_dialog_open:
+		pit_alert_damage = true
+		engineer_message = "Damage detected. Box box. Which compound should we fit?"
+		_open_pit_strategy("Damage")
+	elif player.tyre_wear <= 20.0 and not pit_alert_tyres and not pit_dialog_open:
+		pit_alert_tyres = true
+		engineer_message = "Tyres are heavily worn. Box box. Choose your next compound."
+		_open_pit_strategy("Tyre wear")
+	elif player.fuel_remaining <= 15.0 and not pit_alert_fuel and not pit_dialog_open:
+		pit_alert_fuel = true
+		engineer_message = "Fuel is critical. Box box. Select a compound for the stop."
+		_open_pit_strategy("Fuel")
+	if is_instance_valid(engineer_label):
+		engineer_label.text = engineer_message
+
+func _open_pit_strategy(reason: String) -> void:
+	if pit_dialog_open or not is_instance_valid(player) or race_phase != "RACE":
+		return
+	pit_dialog_open = true
+	player.controls_enabled = false
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-220, -120)
+	panel.custom_minimum_size = Vector2(440, 240)
+	layer.add_child(panel)
+	var column := VBoxContainer.new()
+	panel.add_child(column)
+	var heading := _hud_label("BOX BOX  •  PIT STRATEGY", 22, Color(0.35, 0.82, 1.0))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(heading)
+	var prompt := _hud_label("%s. Which tyre compound do you want?" % reason, 14, Color.WHITE)
+	prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(prompt)
+	var compound_select := OptionButton.new()
+	for compound in ["SOFT", "MEDIUM", "HARD"]:
+		compound_select.add_item(compound)
+	compound_select.select(["SOFT", "MEDIUM", "HARD"].find(player.tyre_compound))
+	column.add_child(compound_select)
+	var actions := HBoxContainer.new()
+	column.add_child(actions)
+	var stay_button := Button.new()
+	stay_button.text = "STAY OUT"
+	stay_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stay_button.pressed.connect(func():
+		pit_dialog_open = false
+		player.controls_enabled = true
+		engineer_message = "Copy. Stay out. We'll monitor the car."
+		engineer_label.text = engineer_message
+		layer.queue_free()
+	)
+	actions.add_child(stay_button)
+	var box_button := Button.new()
+	box_button.text = "BOX NOW  (+22s)"
+	box_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box_button.pressed.connect(func():
+		_complete_pit_stop(compound_select.get_item_text(compound_select.selected), layer)
+	)
+	actions.add_child(box_button)
+
+func _complete_pit_stop(compound: String, layer: CanvasLayer) -> void:
+	selected_tyre_compound = compound
+	player.tyre_compound = compound
+	player.tyre_wear = 100.0
+	player.fuel_remaining = 100.0
+	player.ers_charge = 100.0
+	player.damage = 0.0
+	elapsed += 22.0
+	pit_dialog_open = false
+	player.controls_enabled = true
+	pit_alert_damage = false
+	pit_alert_tyres = false
+	pit_alert_fuel = false
+	engineer_message = "Pit stop complete. %s tyres fitted, damage repaired and fuel replenished." % compound
+	engineer_label.text = engineer_message
+	layer.queue_free()
 
 func _finish_race() -> void:
 	race_finished = true
