@@ -1,0 +1,58 @@
+name: Build Apex Racing for Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.4.1 and Windows export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          GODOT_VERSION="4.4.1"
+          mkdir -p "$HOME/.local/bin" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -o godot.zip
+          unzip -q godot.zip -d godot-bin
+          install -m 0755 godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 "$HOME/.local/bin/godot"
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -o templates.tpz
+          unzip -q templates.tpz -d templates
+          cp -a templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Import project assets
+        run: godot --headless --editor --path . --quit
+
+      - name: Export Windows executable
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-release "Windows Desktop" build/ApexRacing.exe
+          test -s build/ApexRacing.exe
+
+      - name: Upload Windows executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apex-Racing-Windows
+          path: build/ApexRacing.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish downloadable Windows release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-build-${{ github.run_number }}
+          name: Apex Racing Windows build ${{ github.run_number }}
+          body: |
+            Windows build generated automatically from the main branch.
+            Download ApexRacing.exe below. This is an early prototype build.
+          files: build/ApexRacing.exe
+          make_latest: true
