@@ -31,6 +31,7 @@ const DRIVER_NUMBERS_BY_TEAM := [
 	["1", "81"], ["63", "12"], ["3", "6"], ["16", "44"], ["23", "55"],
 	["30", "41"], ["14", "18"], ["31", "87"], ["27", "5"], ["10", "43"], ["11", "77"]
 ]
+const CAR_ERAS := ["2026 Ground Effect", "2010s V8 Hybrid", "2000s V10", "1990s V12 Classic"]
 const TRACKS := [
 	"Apex GP Oval", "Desert Ring", "Harbor Grand Prix",
 	"Monaco Street Circuit", "Silverstone GP", "Monza", "Spa-Francorchamps",
@@ -51,6 +52,7 @@ var track_points: Array[Vector3] = []
 var selected_team := 0
 var selected_driver := 0
 var selected_track := 0
+var selected_car_era := 0
 var selected_tyre_compound := "MEDIUM"
 var tyre_label: Label
 var systems_label: Label
@@ -165,6 +167,14 @@ func _build_menu() -> void:
 	var driver_select := OptionButton.new()
 	driver_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_populate_driver_select(driver_select)
+	_add_menu_label(column, "CAR GENERATION")
+	var era_select := OptionButton.new()
+	era_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for era_name in CAR_ERAS:
+		era_select.add_item(era_name)
+	era_select.select(selected_car_era)
+	era_select.item_selected.connect(func(index: int): selected_car_era = index)
+	column.add_child(era_select)
 	driver_select.item_selected.connect(func(index: int): selected_driver = index)
 	team_select.item_selected.connect(func(index: int):
 		selected_team = index
@@ -470,7 +480,7 @@ func _build_player() -> void:
 		player.position = Vector3(0, 0.45, -track_radius + 7)
 		player.rotation.y = PI
 	add_child(player)
-	_car_visual(player, TEAM_COLORS[selected_team], selected_team)
+	_car_visual(player, TEAM_COLORS[selected_team], selected_team, selected_car_era)
 	var camera := Camera3D.new()
 	camera.position = Vector3(0, 4.8, 10.5)
 	camera.rotation_degrees = Vector3(-18, 0, 0)
@@ -493,7 +503,7 @@ func _build_ai() -> void:
 			ai.speed_factor = 0.78 + float(grid_index % 7) * 0.035
 			ai.track_radius = track_radius
 			add_child(ai)
-			_car_visual(ai, TEAM_COLORS[team_index], team_index)
+			_car_visual(ai, TEAM_COLORS[team_index], team_index, selected_car_era)
 			grid_index += 1
 
 const TEAM_SPONSORS := [
@@ -510,19 +520,25 @@ const TEAM_SPONSORS := [
 	["TWG", "GM", "CHEVROLET", "TOMMY HILFIGER"]
 ]
 
-func _car_visual(parent: Node3D, color: Color, team_index: int) -> void:
+func _car_visual(parent: Node3D, color: Color, team_index: int, car_era: int) -> void:
 	# Lightweight low-poly open-wheel car: nose, sidepods, cockpit, halo, wings and tyres.
 	var carbon := Color(0.018, 0.022, 0.03)
 	var tyre := Color(0.012, 0.014, 0.018)
 	var rim := Color(0.32, 0.36, 0.42)
-	_add_car_box(parent, Vector3(1.12, 0.28, 2.65), Vector3(0, 0.34, 0.05), color)
-	_add_car_box(parent, Vector3(0.48, 0.22, 2.0), Vector3(0, 0.34, -1.92), color.lightened(0.12))
+	var classic := car_era >= 2
+	var nineties := car_era == 3
+	var body_width := 1.12 if not classic else 1.02
+	var nose_width := 0.48 if not classic else (0.62 if nineties else 0.54)
+	var sidepod_width := 0.55 if not classic else 0.62
+	var rear_wing_width := 2.15 if not classic else (2.45 if nineties else 2.3)
+	_add_car_box(parent, Vector3(body_width, 0.28, 2.65), Vector3(0, 0.34, 0.05), color)
+	_add_car_box(parent, Vector3(nose_width, 0.22, 2.0), Vector3(0, 0.34, -1.92), color.lightened(0.12))
 	_add_car_box(parent, Vector3(0.72, 0.22, 1.05), Vector3(0, 0.48, 0.9), color.darkened(0.12))
 	for x in [-0.72, 0.72]:
-		_add_car_box(parent, Vector3(0.55, 0.42, 1.45), Vector3(x, 0.38, 0.15), color.darkened(0.08))
+		_add_car_box(parent, Vector3(sidepod_width, 0.42, 1.45), Vector3(x, 0.38, 0.15), color.darkened(0.08))
 		_add_car_box(parent, Vector3(0.12, 0.16, 0.95), Vector3(x * 1.25, 0.48, 0.15), carbon)
-	_add_car_box(parent, Vector3(2.15, 0.12, 0.48), Vector3(0, 0.2, -2.75), carbon)
-	_add_car_box(parent, Vector3(2.0, 0.055, 0.28), Vector3(0, 0.29, -2.62), color)
+	_add_car_box(parent, Vector3(rear_wing_width, 0.12, 0.48), Vector3(0, 0.2, -2.75), carbon)
+	_add_car_box(parent, Vector3(rear_wing_width - 0.15, 0.055, 0.28), Vector3(0, 0.29, -2.62), color)
 	for x in [-1.02, 1.02]:
 		_add_car_box(parent, Vector3(0.1, 0.38, 0.5), Vector3(x, 0.35, -2.72), color)
 	_add_car_box(parent, Vector3(1.9, 0.12, 0.42), Vector3(0, 0.88, 1.72), carbon)
@@ -531,10 +547,14 @@ func _car_visual(parent: Node3D, color: Color, team_index: int) -> void:
 		_add_car_box(parent, Vector3(0.1, 0.55, 0.36), Vector3(x, 0.72, 1.72), color)
 	_add_car_box(parent, Vector3(1.0, 0.12, 0.5), Vector3(0, 0.22, 1.55), carbon)
 	_add_car_box(parent, Vector3(0.56, 0.22, 0.78), Vector3(0, 0.63, -0.62), carbon)
-	_add_car_box(parent, Vector3(0.075, 0.12, 0.9), Vector3(0, 0.84, -0.66), rim)
-	_add_car_box(parent, Vector3(0.72, 0.07, 0.075), Vector3(0, 0.88, -0.25), rim)
-	for x in [-0.34, 0.34]:
-		_add_car_box(parent, Vector3(0.07, 0.16, 0.08), Vector3(x, 0.82, -0.26), rim)
+	if car_era <= 1:
+		_add_car_box(parent, Vector3(0.075, 0.12, 0.9), Vector3(0, 0.84, -0.66), rim)
+		_add_car_box(parent, Vector3(0.72, 0.07, 0.075), Vector3(0, 0.88, -0.25), rim)
+		for x in [-0.34, 0.34]:
+			_add_car_box(parent, Vector3(0.07, 0.16, 0.08), Vector3(x, 0.82, -0.26), rim)
+	else:
+		# Earlier open-cockpit generations use a small windscreen instead of a halo.
+		_add_car_box(parent, Vector3(0.62, 0.22, 0.12), Vector3(0, 0.79, -0.3), Color(0.12, 0.2, 0.27))
 	for x in [-0.98, 0.98]:
 		for z in [-1.65, 1.35]:
 			_add_car_cylinder(parent, 0.48, 0.34, Vector3(x, 0.34, z), tyre)
@@ -551,7 +571,13 @@ func _car_visual(parent: Node3D, color: Color, team_index: int) -> void:
 		_add_car_box(parent, Vector3(0.48, 0.045, 1.12), Vector3(x, 0.605, 0.12), accent)
 		_add_car_box(parent, Vector3(0.62, 0.08, 1.58), Vector3(x, 0.16, 0.18), dark_trim)
 	# Engine cover spine, cockpit dashboard and rear diffuser.
-	_add_car_box(parent, Vector3(0.16, 0.12, 1.1), Vector3(0, 0.66, 0.58), accent)
+	_add_car_box(parent, Vector3(0.16 if not classic else 0.25, 0.12, 1.1 if not classic else 1.35), Vector3(0, 0.66, 0.58), accent)
+	if classic:
+		# Longer engine cover and raised exhaust fairing evoke naturally aspirated V10/V12-era cars.
+		_add_car_box(parent, Vector3(0.48, 0.16, 1.25), Vector3(0, 0.59, 1.05), color.darkened(0.16))
+		_add_car_box(parent, Vector3(0.36, 0.10, 0.32), Vector3(0, 0.72, 1.55), carbon)
+		if nineties:
+			_add_car_box(parent, Vector3(0.42, 0.18, 0.55), Vector3(0, 0.69, 0.9), color.lightened(0.08))
 	_add_car_box(parent, Vector3(0.42, 0.045, 0.24), Vector3(0, 0.77, -0.42), rim)
 	_add_car_box(parent, Vector3(1.35, 0.12, 0.38), Vector3(0, 0.12, 2.0), dark_trim)
 	# Rear wing endplates and subtle tyre sidewall bands.
