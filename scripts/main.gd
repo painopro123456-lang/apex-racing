@@ -57,6 +57,7 @@ var ai_difficulty := 2
 var race_mode := "RACE"
 var championship_active := false
 var championship_round := 0
+var championship_round_complete := false
 var championship_rounds := 5
 var championship_base_track := 0
 var championship_standings: Dictionary = {}
@@ -91,7 +92,10 @@ func _ready() -> void:
 	_build_environment()
 	_build_menu()
 	if championship_active:
-		call_deferred("_resume_championship")
+		if championship_round_complete:
+			call_deferred("_show_championship_continue")
+		else:
+			call_deferred("_resume_championship")
 
 func _build_environment() -> void:
 	var env_node := WorldEnvironment.new()
@@ -1191,6 +1195,8 @@ func _finish_race() -> void:
 	var total_points := 0
 	if race_mode == "CHAMPIONSHIP":
 		points_earned = _award_championship_points()
+		championship_round_complete = true
+		_save_championship()
 		total_points = int(championship_standings.get(DRIVERS_BY_TEAM[selected_team][selected_driver], 0))
 	var result_layer := CanvasLayer.new()
 	add_child(result_layer)
@@ -1239,6 +1245,7 @@ func _finish_race() -> void:
 
 func _start_championship() -> void:
 	championship_active = true
+	championship_round_complete = false
 	championship_round = 0
 	championship_base_track = selected_track
 	championship_standings.clear()
@@ -1246,6 +1253,7 @@ func _start_championship() -> void:
 	_start_race("CHAMPIONSHIP")
 
 func _advance_championship() -> void:
+	championship_round_complete = false
 	championship_round += 1
 	_save_championship()
 	get_tree().reload_current_scene()
@@ -1253,8 +1261,38 @@ func _advance_championship() -> void:
 func _resume_championship() -> void:
 	_start_race("CHAMPIONSHIP")
 
+func _show_championship_continue() -> void:
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var panel := PanelContainer.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-250, -170)
+	panel.custom_minimum_size = Vector2(500, 340)
+	layer.add_child(panel)
+	var column := VBoxContainer.new()
+	panel.add_child(column)
+	var heading := Label.new()
+	heading.text = "CHAMPIONSHIP ROUND %d COMPLETE" % (championship_round + 1)
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 24)
+	column.add_child(heading)
+	var standings := Label.new()
+	standings.text = "SAVED SEASON STANDINGS\\n" + _championship_standings_text()
+	standings.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(standings)
+	var continue_button := Button.new()
+	continue_button.custom_minimum_size = Vector2(0, 44)
+	if championship_round + 1 < championship_rounds:
+		continue_button.text = "CONTINUE TO NEXT ROUND"
+		continue_button.pressed.connect(func(): layer.queue_free(); _advance_championship())
+	else:
+		continue_button.text = "FINISH SEASON"
+		continue_button.pressed.connect(func(): layer.queue_free(); _complete_championship())
+	column.add_child(continue_button)
+
 func _complete_championship() -> void:
 	championship_active = false
+	championship_round_complete = false
 	championship_round = 0
 	championship_standings.clear()
 	_save_championship()
@@ -1295,6 +1333,7 @@ func _save_championship() -> void:
 	var config := ConfigFile.new()
 	config.set_value("season", "active", championship_active)
 	config.set_value("season", "round", championship_round)
+	config.set_value("season", "round_complete", championship_round_complete)
 	config.set_value("season", "team", selected_team)
 	config.set_value("season", "driver", selected_driver)
 	config.set_value("season", "car_era", selected_car_era)
@@ -1309,7 +1348,8 @@ func _load_championship() -> void:
 	if config.load(CHAMPIONSHIP_SAVE_PATH) != OK:
 		return
 	championship_active = bool(config.get_value("season", "active", false))
-	championship_round = int(config.get_value("season", "round", 0))
+	championship_round = clampi(int(config.get_value("season", "round", 0)), 0, championship_rounds - 1)
+	championship_round_complete = bool(config.get_value("season", "round_complete", false))
 	selected_team = clampi(int(config.get_value("season", "team", selected_team)), 0, TEAM_NAMES.size() - 1)
 	selected_driver = clampi(int(config.get_value("season", "driver", selected_driver)), 0, DRIVERS_BY_TEAM[selected_team].size() - 1)
 	selected_car_era = clampi(int(config.get_value("season", "car_era", selected_car_era)), 0, CAR_ERAS.size() - 1)
