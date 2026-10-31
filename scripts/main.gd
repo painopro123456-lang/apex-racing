@@ -344,7 +344,7 @@ func _build_menu() -> void:
 	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
 	race_page.add_child(tyre_select)
 	var race_summary := Label.new()
-	race_summary.text = "2-LAP QUALIFYING  +  3-LAP RACE   •   22-CAR GRID"
+	race_summary.text = "2-LAP QUALIFYING  +  MAIN RACE   •   22-CAR GRID"
 	race_summary.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
 	race_page.add_child(race_summary)
 	var start := Button.new()
@@ -496,8 +496,8 @@ func _start_race(mode: String = "RACE") -> void:
 	_apply_graphics_quality()
 	menu_layer.queue_free()
 	_build_track(selected_track)
-	_apply_track_setup()
 	_build_player()
+	_apply_track_setup()
 	player.tyre_compound = selected_tyre_compound
 	_build_ai()
 	_build_hud()
@@ -1148,6 +1148,8 @@ func _process(delta: float) -> void:
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
 		systems_label.text = "FUEL  %02d%%  •  DAMAGE %02d%%" % [int(player.fuel_remaining), int(player.damage)]
+		if not track_setup.is_empty():
+			setup_label.text = "BB %.0f%%  •  AERO %.0f  •  FW %.0f / RW %.0f" % [track_setup["brake_bias"], track_setup["aero"], track_setup["front_wing"], track_setup["rear_wing"]]
 		drs_label.text = "DRS  •  ACTIVE" if player.drs_active else ("DRS  •  AVAILABLE" if player.drs_zone else "DRS  •  DISABLED")
 		drs_label.add_theme_color_override("font_color", Color(0.28, 0.95, 0.66) if player.drs_active else Color(0.62, 0.69, 0.76))
 		var progress := _player_progress_score()
