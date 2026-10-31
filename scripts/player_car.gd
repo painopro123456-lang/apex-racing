@@ -17,6 +17,8 @@ var front_wing := 60.0
 var rear_wing := 60.0
 var damage := 0.0
 var collision_count := 0
+var collision_cooldown := 0.0
+var tyre_punctured := false
 
 var throttle_input := 0.0
 var brake_input := 0.0
@@ -50,8 +52,7 @@ func _physics_process(delta: float) -> void:
 		if forward_speed < -0.5:
 			forward_speed = move_toward(forward_speed, 0.0, braking * _brake_effectiveness() * delta)
 		else:
-			var fuel_power: float = 0.55 if fuel_remaining <= 0.0 else lerp(0.72, 1.0, fuel_remaining / 100.0)
-			fuel_power *= clamp(1.0 - damage * 0.0035, 0.62, 1.0)
+			var fuel_power: float = clamp(1.0 - damage * 0.0035, 0.62, 1.0)
 			var ers_power: float = 8.0 if ers_requested else 0.0
 			var speed_cap: float = max_speed + (8.0 if drs_active else 0.0) + ers_power
 			forward_speed = move_toward(forward_speed, speed_cap, (acceleration * fuel_power + ers_power * 0.9) * delta * throttle_input)
@@ -73,7 +74,8 @@ func _physics_process(delta: float) -> void:
 	var wear_grip: float = lerp(0.58, 1.0, tyre_wear / 100.0)
 	var wing_grip: float = lerp(0.82, 1.22, (front_wing + rear_wing) / 200.0)
 	var damage_grip: float = clamp(1.0 - damage * 0.0028, 0.68, 1.0)
-	var available_grip: float = (lateral_grip + downforce_grip) * compound_grip * wear_grip * wing_grip * damage_grip
+	var puncture_grip: float = 0.52 if tyre_punctured else 1.0
+	var available_grip: float = (lateral_grip + downforce_grip) * compound_grip * wear_grip * wing_grip * damage_grip * puncture_grip
 	side_speed = move_toward(side_speed, 0.0, available_grip * delta)
 
 	# Steering response builds with speed, while very high speed slightly limits yaw rate.
@@ -93,8 +95,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y -= 24.0 * delta
 	speed = abs(forward_speed)
-	if throttle_input > 0.05 and fuel_remaining > 0.0:
-		fuel_remaining = max(0.0, fuel_remaining - delta * (0.045 + throttle_input * 0.12))
+	collision_cooldown = max(0.0, collision_cooldown - delta)
 	if ers_requested and throttle_input > 0.05:
 		ers_charge = max(0.0, ers_charge - delta * 24.0)
 	elif brake_input > 0.05 or forward_speed < 0.0:
@@ -103,15 +104,23 @@ func _physics_process(delta: float) -> void:
 		var wear_rate := 0.045 if tyre_compound == "SOFT" else (0.022 if tyre_compound == "HARD" else 0.032)
 		tyre_wear = max(0.0, tyre_wear - abs(forward_speed) * delta * wear_rate)
 	move_and_slide()
+	if get_slide_collision_count() > 0 and collision_cooldown <= 0.0 and abs(forward_speed) > 4.0:
+		var impact_collision := get_slide_collision(0)
+		apply_collision(impact_collision.get_normal())
+		collision_cooldown = 0.65
 
 func _brake_effectiveness() -> float:
 	# A little more front bias improves stability under braking; excessive bias costs stopping performance.
 	return clamp(1.0 - abs(brake_bias - 56.0) * 0.0025, 0.88, 1.0)
 
 func apply_collision(impact_direction: Vector3) -> void:
-	# Collision damage reduces power and grip until repaired in the pits.
-	damage = min(100.0, damage + 12.0)
+	# Barrier impacts damage the car; a puncture is possible, never guaranteed.
+	var impact_speed: float = velocity.length()
+	damage = min(100.0, damage + clamp(impact_speed * 0.22, 5.0, 22.0))
+	if not tyre_punctured and impact_speed > 18.0 and randf() < 0.12:
+		tyre_punctured = true
 	collision_count += 1
+	collision_cooldown = 0.65
 	var impact := impact_direction.normalized()
 	velocity.x += impact.x * 9.0
 	velocity.z += impact.z * 9.0
