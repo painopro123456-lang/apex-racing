@@ -164,31 +164,47 @@ func _build_environment() -> void:
 	var env_node := WorldEnvironment.new()
 	world_environment = env_node
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.32, 0.49, 0.67)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.8, 0.84, 0.9)
-	env.ambient_light_energy = 0.95
+	env.background_mode = Environment.BG_SKY
+	var sky := Sky.new()
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color(0.12, 0.22, 0.38)
+	sky_material.sky_horizon_color = Color(0.58, 0.68, 0.78)
+	sky_material.ground_bottom_color = Color(0.075, 0.09, 0.11)
+	sky_material.ground_horizon_color = Color(0.34, 0.40, 0.44)
+	sky_material.sun_angle_max = 18.0
+	sky.sky_material = sky_material
+	env.sky = sky
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_energy = 0.72
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_BG
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = 1.08
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.55, 0.66, 0.76)
-	env.fog_density = 0.0018
+	env.fog_density = 0.00115
 	env_node.environment = env
 	add_child(env_node)
 	var sun := DirectionalLight3D.new()
 	sun_light = sun
 	sun.rotation_degrees = Vector3(-52, -28, 0)
 	sun.shadow_enabled = true
-	sun.light_energy = 1.25
-	sun.directional_shadow_max_distance = 180.0
+	sun.light_energy = 1.35
+	sun.directional_shadow_max_distance = 145.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.shadow_bias = 0.035
+	sun.shadow_normal_bias = 1.2
 	add_child(sun)
 	var ground := MeshInstance3D.new()
 	var ground_mesh := PlaneMesh.new()
-	ground_mesh.size = Vector2(300, 300)
+	ground_mesh.size = Vector2(420, 420)
 	ground.mesh = ground_mesh
-	ground.material_override = _mat(Color(0.10, 0.24, 0.13))
+	var ground_material := StandardMaterial3D.new()
+	ground_material.albedo_color = Color(0.075, 0.16, 0.085)
+	ground_material.roughness = 1.0
+	ground_material.metallic = 0.0
+	ground.material_override = ground_material
 	ground.position.y = -0.2
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ground)
 
 func _apply_graphics_quality() -> void:
@@ -205,8 +221,14 @@ func _apply_graphics_quality() -> void:
 		world_environment.environment.fog_enabled = graphics_quality >= 1
 		world_environment.environment.fog_density = fog_levels[graphics_quality]
 		world_environment.environment.ambient_light_energy = ambient_levels[graphics_quality]
-		world_environment.environment.ssao_enabled = false
+		world_environment.environment.ssao_enabled = graphics_quality >= 2
 		world_environment.environment.ssil_enabled = false
+		world_environment.environment.glow_enabled = graphics_quality >= 2
+		world_environment.environment.glow_intensity = 0.28
+		world_environment.environment.glow_strength = 0.55
+		world_environment.environment.adjustment_enabled = true
+		world_environment.environment.adjustment_contrast = 1.08
+		world_environment.environment.adjustment_saturation = 1.12
 func _create_menu_theme() -> Theme:
 	var theme := Theme.new()
 	var normal := StyleBoxFlat.new()
@@ -690,6 +712,9 @@ func _build_track(track_index: int) -> void:
 	_add_track_ribbon(points, -13.2, -7.55, 0.015, runoff_mat)
 	_add_track_ribbon(points, 7.55, 13.2, 0.015, runoff_mat)
 	_add_track_ribbon(points, -7.5, 7.5, 0.105, road_mat)
+	# Fine white edge lines, consistent with real circuit markings.
+	_add_track_ribbon(points, 7.18, 7.42, 0.16, _mat(Color(0.96, 0.96, 0.91)))
+	_add_track_ribbon(points, -7.42, -7.18, 0.16, _mat(Color(0.96, 0.96, 0.91)))
 
 	var road_physics := StaticBody3D.new()
 	road_physics.collision_layer = 1
