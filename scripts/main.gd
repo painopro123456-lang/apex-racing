@@ -132,97 +132,255 @@ func _build_menu() -> void:
 	menu_layer = CanvasLayer.new()
 	add_child(menu_layer)
 	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.015, 0.025, 0.045, 0.94)
+	backdrop.color = Color(0.012, 0.022, 0.042, 0.97)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_layer.add_child(backdrop)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	menu_layer.add_child(center)
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(610, 0)
-	center.add_child(panel)
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 13)
-	panel.add_child(column)
-	var title := Label.new()
-	title.text = "APEX RACING"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 38)
-	column.add_child(title)
-	var subtitle := Label.new()
-	subtitle.text = "CHOOSE YOUR CAR, DRIVER AND CIRCUIT"
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 14)
-	subtitle.add_theme_color_override("font_color", Color(0.55, 0.72, 0.95))
-	column.add_child(subtitle)
-	_add_menu_label(column, "TEAM / CAR")
+
+	var outer := MarginContainer.new()
+	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	outer.add_theme_constant_override("margin_left", 34)
+	outer.add_theme_constant_override("margin_right", 34)
+	outer.add_theme_constant_override("margin_top", 24)
+	outer.add_theme_constant_override("margin_bottom", 24)
+	menu_layer.add_child(outer)
+
+	var layout := HBoxContainer.new()
+	layout.add_theme_constant_override("separation", 22)
+	outer.add_child(layout)
+
+	var sidebar := PanelContainer.new()
+	sidebar.custom_minimum_size = Vector2(205, 0)
+	var side_style := StyleBoxFlat.new()
+	side_style.bg_color = Color(0.025, 0.045, 0.075, 0.98)
+	side_style.border_color = Color(0.13, 0.24, 0.38, 0.9)
+	side_style.set_border_width_all(1)
+	side_style.set_corner_radius_all(8)
+	sidebar.add_theme_stylebox_override("panel", side_style)
+	layout.add_child(sidebar)
+	var side_column := VBoxContainer.new()
+	side_column.add_theme_constant_override("separation", 12)
+	sidebar.add_child(side_column)
+
+	var brand := Label.new()
+	brand.text = "APEX\nRACING"
+	brand.add_theme_font_size_override("font_size", 30)
+	brand.add_theme_color_override("font_color", Color(0.91, 0.95, 1.0))
+	side_column.add_child(brand)
+	var season := Label.new()
+	season.text = "2026  /  MOTORSPORT"
+	season.add_theme_font_size_override("font_size", 10)
+	season.add_theme_color_override("font_color", Color(0.42, 0.65, 0.91))
+	side_column.add_child(season)
+	var separator := HSeparator.new()
+	side_column.add_child(separator)
+	_add_menu_label(side_column, "MAIN MENU")
+	var pages: Dictionary = {}
+	var content_column := VBoxContainer.new()
+	content_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_column.add_theme_constant_override("separation", 16)
+	layout.add_child(content_column)
+
+	var header := HBoxContainer.new()
+	content_column.add_child(header)
+	var heading := Label.new()
+	heading.text = "WORLD OF RACING"
+	heading.add_theme_font_size_override("font_size", 13)
+	heading.add_theme_color_override("font_color", Color(0.56, 0.72, 0.94))
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(heading)
+	var status := Label.new()
+	status.text = "OFFLINE  •  SINGLE PLAYER"
+	status.add_theme_font_size_override("font_size", 10)
+	status.add_theme_color_override("font_color", Color(0.65, 0.76, 0.87))
+	header.add_child(status)
+
+	var page_host := VBoxContainer.new()
+	page_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_column.add_child(page_host)
+
+	var home := VBoxContainer.new()
+	home.add_theme_constant_override("separation", 16)
+	page_host.add_child(home)
+	pages["HOME"] = home
+	var welcome := Label.new()
+	welcome.text = "WELCOME TO APEX RACING"
+	welcome.add_theme_font_size_override("font_size", 29)
+	welcome.add_theme_color_override("font_color", Color(0.94, 0.96, 1.0))
+	home.add_child(welcome)
+	var tagline := Label.new()
+	tagline.text = "Your grid. Your era. Your race."
+	tagline.add_theme_font_size_override("font_size", 15)
+	tagline.add_theme_color_override("font_color", Color(0.62, 0.72, 0.85))
+	home.add_child(tagline)
+	var hero := PanelContainer.new()
+	hero.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var hero_style := StyleBoxFlat.new()
+	hero_style.bg_color = Color(0.035, 0.075, 0.13, 0.98)
+	hero_style.border_color = Color(0.12, 0.38, 0.72, 0.9)
+	hero_style.set_border_width_all(1)
+	hero_style.set_corner_radius_all(8)
+	hero.add_theme_stylebox_override("panel", hero_style)
+	home.add_child(hero)
+	var hero_content := VBoxContainer.new()
+	hero_content.add_theme_constant_override("separation", 12)
+	hero.add_child(hero_content)
+	var round_label := Label.new()
+	round_label.text = "FEATURED EVENT  /  GRAND PRIX"
+	round_label.add_theme_font_size_override("font_size", 11)
+	round_label.add_theme_color_override("font_color", Color(0.4, 0.68, 1.0))
+	hero_content.add_child(round_label)
+	var hero_title := Label.new()
+	hero_title.text = "TAKE YOUR PLACE\nON THE GRID"
+	hero_title.add_theme_font_size_override("font_size", 32)
+	hero_title.add_theme_color_override("font_color", Color(0.97, 0.98, 1.0))
+	hero_content.add_child(hero_title)
+	var hero_desc := Label.new()
+	hero_desc.text = "Choose a team, pick your generation of Formula car and race a full 22-car field."
+	hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hero_desc.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
+	hero_content.add_child(hero_desc)
+	var setup_button := Button.new()
+	setup_button.text = "RACE WEEKEND  →"
+	setup_button.custom_minimum_size = Vector2(0, 48)
+	setup_button.pressed.connect(func(): _set_menu_page(pages, "RACE"))
+	hero_content.add_child(setup_button)
+	var quick_button := Button.new()
+	quick_button.text = "QUICK RACE  —  CURRENT SELECTION"
+	quick_button.custom_minimum_size = Vector2(0, 42)
+	quick_button.pressed.connect(_start_race)
+	hero_content.add_child(quick_button)
+	var footer := Label.new()
+	footer.text = "11 TEAMS     22 DRIVERS     %d CIRCUITS     4 CAR GENERATIONS" % TRACKS.size()
+	footer.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
+	home.add_child(footer)
+
+	var race_page := VBoxContainer.new()
+	race_page.add_theme_constant_override("separation", 10)
+	page_host.add_child(race_page)
+	pages["RACE"] = race_page
+	var race_title := Label.new()
+	race_title.text = "RACE WEEKEND"
+	race_title.add_theme_font_size_override("font_size", 27)
+	race_page.add_child(race_title)
+	_add_menu_label(race_page, "CIRCUIT")
+	var track_select := OptionButton.new()
+	track_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for track in TRACKS:
+		track_select.add_item(track)
+	track_select.select(selected_track)
+	track_select.item_selected.connect(func(index: int): selected_track = index)
+	race_page.add_child(track_select)
+	_add_menu_label(race_page, "TYRE COMPOUND")
+	var tyre_select := OptionButton.new()
+	for compound in ["SOFT", "MEDIUM", "HARD"]:
+		tyre_select.add_item(compound)
+	tyre_select.select(1)
+	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
+	race_page.add_child(tyre_select)
+	var race_summary := Label.new()
+	race_summary.text = "3-LAP RACE   •   22-CAR GRID   •   AI OPPONENTS"
+	race_summary.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
+	race_page.add_child(race_summary)
+	var start := Button.new()
+	start.text = "START RACE"
+	start.custom_minimum_size = Vector2(0, 52)
+	start.pressed.connect(_start_race)
+	race_page.add_child(start)
+	var back_race := Button.new()
+	back_race.text = "BACK TO HOME"
+	back_race.pressed.connect(func(): _set_menu_page(pages, "HOME"))
+	race_page.add_child(back_race)
+
+	var garage := VBoxContainer.new()
+	garage.add_theme_constant_override("separation", 10)
+	page_host.add_child(garage)
+	pages["GARAGE"] = garage
+	var garage_title := Label.new()
+	garage_title.text = "GARAGE"
+	garage_title.add_theme_font_size_override("font_size", 27)
+	garage.add_child(garage_title)
+	_add_menu_label(garage, "TEAM")
 	var team_select := OptionButton.new()
 	team_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for team in TEAM_NAMES:
 		team_select.add_item(team)
-	team_select.selected = selected_team
-	team_select.item_selected.connect(func(index: int): selected_team = index)
-	column.add_child(team_select)
-	_add_menu_label(column, "YOUR DRIVER")
+	team_select.select(selected_team)
+	garage.add_child(team_select)
+	_add_menu_label(garage, "DRIVER")
 	var driver_select := OptionButton.new()
 	driver_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_populate_driver_select(driver_select)
-	_add_menu_label(column, "CAR GENERATION")
-	var era_select := OptionButton.new()
-	era_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for era_name in CAR_ERAS:
-		era_select.add_item(era_name)
-	era_select.select(selected_car_era)
-	era_select.item_selected.connect(func(index: int): selected_car_era = index)
-	column.add_child(era_select)
-	driver_select.item_selected.connect(func(index: int): selected_driver = index)
+	garage.add_child(driver_select)
 	team_select.item_selected.connect(func(index: int):
 		selected_team = index
 		selected_driver = 0
 		_populate_driver_select(driver_select)
 	)
-	column.add_child(driver_select)
-	_add_menu_label(column, "CIRCUIT")
-	var track_select := OptionButton.new()
-	track_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for track in TRACKS:
-		track_select.add_item(track)
-	track_select.selected = selected_track
-	track_select.item_selected.connect(func(index: int): selected_track = index)
-	column.add_child(track_select)
-	_add_menu_label(column, "TYRE COMPOUND")
-	var tyre_select := OptionButton.new()
-	tyre_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for compound in ["SOFT", "MEDIUM", "HARD"]:
-		tyre_select.add_item(compound)
-	tyre_select.select(1)
-	tyre_select.item_selected.connect(func(index: int): selected_tyre_compound = ["SOFT", "MEDIUM", "HARD"][index])
-	column.add_child(tyre_select)
-	_add_menu_label(column, "GRAPHICS QUALITY")
+	driver_select.item_selected.connect(func(index: int): selected_driver = index)
+	_add_menu_label(garage, "CAR GENERATION")
+	var era_select := OptionButton.new()
+	for era_name in CAR_ERAS:
+		era_select.add_item(era_name)
+	era_select.select(selected_car_era)
+	era_select.item_selected.connect(func(index: int): selected_car_era = index)
+	garage.add_child(era_select)
+	var garage_note := Label.new()
+	garage_note.text = "Selected team colours are used as the car's base livery."
+	garage_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	garage_note.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
+	garage.add_child(garage_note)
+	var back_garage := Button.new()
+	back_garage.text = "BACK TO HOME"
+	back_garage.pressed.connect(func(): _set_menu_page(pages, "HOME"))
+	garage.add_child(back_garage)
+
+	var settings := VBoxContainer.new()
+	settings.add_theme_constant_override("separation", 12)
+	page_host.add_child(settings)
+	pages["SETTINGS"] = settings
+	var settings_title := Label.new()
+	settings_title.text = "SETTINGS"
+	settings_title.add_theme_font_size_override("font_size", 27)
+	settings.add_child(settings_title)
+	_add_menu_label(settings, "GRAPHICS QUALITY")
 	var quality_select := OptionButton.new()
-	quality_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for quality_name in ["LOW  •  INTEGRATED GPU", "BALANCED", "HIGH", "ULTRA"]:
 		quality_select.add_item(quality_name)
 	quality_select.select(graphics_quality)
 	quality_select.item_selected.connect(func(index: int): graphics_quality = index)
-	column.add_child(quality_select)
-	var info := Label.new()
-	info.text = "11 teams  •  22 drivers  •  %d circuits  •  22-car grid" % TRACKS.size()
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88))
-	column.add_child(info)
-	var start := Button.new()
-	start.text = "START RACE"
-	start.custom_minimum_size = Vector2(0, 52)
-	start.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	start.pressed.connect(_start_race)
-	column.add_child(start)
-	var note := Label.new()
-	note.text = "2026 driver roster • team colours are approximate, not official liveries."
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.add_theme_font_size_override("font_size", 11)
-	note.add_theme_color_override("font_color", Color(0.58, 0.62, 0.7))
-	column.add_child(note)
+	settings.add_child(quality_select)
+	var settings_note := Label.new()
+	settings_note.text = "Low reduces visual effects for integrated graphics. High is the default."
+	settings_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	settings_note.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
+	settings.add_child(settings_note)
+	var back_settings := Button.new()
+	back_settings.text = "BACK TO HOME"
+	back_settings.pressed.connect(func(): _set_menu_page(pages, "HOME"))
+	settings.add_child(back_settings)
+
+	for page_name in ["HOME", "RACE", "GARAGE", "SETTINGS"]:
+		var nav := Button.new()
+		nav.text = page_name
+		nav.custom_minimum_size = Vector2(0, 44)
+		nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nav.pressed.connect(func(): _set_menu_page(pages, page_name))
+		side_column.add_child(nav)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	side_column.add_child(spacer)
+	var build_info := Label.new()
+	build_info.text = "APEX RACING\nWINDOWS EDITION"
+	build_info.add_theme_font_size_override("font_size", 10)
+	build_info.add_theme_color_override("font_color", Color(0.46, 0.57, 0.7))
+	side_column.add_child(build_info)
+	_set_menu_page(pages, "HOME")
+
+func _set_menu_page(pages: Dictionary, selected_page: String) -> void:
+	for page_name in pages:
+		var page: Control = pages[page_name]
+		page.visible = page_name == selected_page
 
 func _populate_driver_select(driver_select: OptionButton) -> void:
 	driver_select.clear()
