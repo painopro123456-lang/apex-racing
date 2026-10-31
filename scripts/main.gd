@@ -122,6 +122,7 @@ const TRACK_SETUP_PRESETS := {
 	"Imola": {"brake_bias": 56.0, "aero": 62.0, "front_wing": 59.0, "rear_wing": 66.0},
 	"Portimao": {"brake_bias": 56.0, "aero": 72.0, "front_wing": 69.0, "rear_wing": 75.0}
 }
+var environment_built := false
 var race_started := false
 var countdown_remaining := 3.0
 var start_light_stage := 0
@@ -152,7 +153,6 @@ var career_best_qualifying := INF
 func _ready() -> void:
 	_load_profile()
 	_load_championship()
-	_build_environment()
 	_build_menu()
 	if championship_active:
 		if championship_round_complete:
@@ -207,11 +207,96 @@ func _apply_graphics_quality() -> void:
 		world_environment.environment.ambient_light_energy = ambient_levels[graphics_quality]
 		world_environment.environment.ssao_enabled = false
 		world_environment.environment.ssil_enabled = false
+func _create_menu_theme() -> Theme:
+	var theme := Theme.new()
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.09, 0.105, 0.135, 1.0)
+	normal.border_color = Color(0.19, 0.22, 0.28, 1.0)
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(7)
+	normal.content_margin_left = 16.0
+	normal.content_margin_right = 16.0
+	normal.content_margin_top = 10.0
+	normal.content_margin_bottom = 10.0
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.15, 0.17, 0.21, 1.0)
+	hover.border_color = Color(0.92, 0.18, 0.22, 1.0)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.42, 0.075, 0.09, 1.0)
+	pressed.border_color = Color(1.0, 0.24, 0.27, 1.0)
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color(0.06, 0.07, 0.09, 1.0)
+	disabled.border_color = Color(0.12, 0.14, 0.17, 1.0)
+	theme.set_stylebox("normal", "Button", normal)
+	theme.set_stylebox("hover", "Button", hover)
+	theme.set_stylebox("pressed", "Button", pressed)
+	theme.set_stylebox("focus", "Button", hover)
+	theme.set_stylebox("disabled", "Button", disabled)
+	theme.set_color("font_color", "Button", Color(0.91, 0.93, 0.96))
+	theme.set_color("font_hover_color", "Button", Color.WHITE)
+	theme.set_color("font_pressed_color", "Button", Color.WHITE)
+	theme.set_color("font_disabled_color", "Button", Color(0.43, 0.46, 0.51))
+	theme.set_font_size("font_size", "Button", 13)
+	var field := StyleBoxFlat.new()
+	field.bg_color = Color(0.045, 0.055, 0.073, 1.0)
+	field.border_color = Color(0.24, 0.28, 0.35, 1.0)
+	field.set_border_width_all(1)
+	field.set_corner_radius_all(6)
+	field.content_margin_left = 12.0
+	field.content_margin_right = 12.0
+	field.content_margin_top = 8.0
+	field.content_margin_bottom = 8.0
+	theme.set_stylebox("normal", "OptionButton", field)
+	theme.set_stylebox("hover", "OptionButton", hover)
+	theme.set_color("font_color", "OptionButton", Color(0.94, 0.95, 0.97))
+	return theme
+
+
+func _show_loading_overlay() -> Control:
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.018, 0.022, 0.03, 0.96)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	menu_layer.add_child(overlay)
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -210
+	panel.offset_top = -72
+	panel.offset_right = 210
+	panel.offset_bottom = 72
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.07, 0.08, 0.105, 1.0)
+	panel_style.border_color = Color(0.9, 0.16, 0.19, 1.0)
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(10)
+	panel.add_theme_stylebox_override("panel", panel_style)
+	overlay.add_child(panel)
+	var column := VBoxContainer.new()
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override("separation", 12)
+	panel.add_child(column)
+	var title := Label.new()
+	title.text = "PREPARING THE CIRCUIT"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	column.add_child(title)
+	var detail := Label.new()
+	detail.text = "Building track, grid and race systems..."
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.add_theme_color_override("font_color", Color(0.65, 0.7, 0.78))
+	column.add_child(detail)
+	return overlay
+
+
 func _build_menu() -> void:
 	menu_layer = CanvasLayer.new()
+	menu_layer.theme = _create_menu_theme()
 	add_child(menu_layer)
 	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.012, 0.022, 0.042, 0.97)
+	backdrop.color = Color(0.025, 0.031, 0.043, 0.99)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	menu_layer.add_child(backdrop)
 
@@ -230,8 +315,8 @@ func _build_menu() -> void:
 	var sidebar := PanelContainer.new()
 	sidebar.custom_minimum_size = Vector2(205, 0)
 	var side_style := StyleBoxFlat.new()
-	side_style.bg_color = Color(0.025, 0.045, 0.075, 0.98)
-	side_style.border_color = Color(0.13, 0.24, 0.38, 0.9)
+	side_style.bg_color = Color(0.055, 0.067, 0.088, 0.99)
+	side_style.border_color = Color(0.22, 0.25, 0.31, 0.9)
 	side_style.set_border_width_all(1)
 	side_style.set_corner_radius_all(8)
 	sidebar.add_theme_stylebox_override("panel", side_style)
@@ -243,12 +328,12 @@ func _build_menu() -> void:
 	var brand := Label.new()
 	brand.text = "APEX\nRACING"
 	brand.add_theme_font_size_override("font_size", 30)
-	brand.add_theme_color_override("font_color", Color(0.91, 0.95, 1.0))
+	brand.add_theme_color_override("font_color", Color(0.98, 0.98, 0.99))
 	side_column.add_child(brand)
 	var season := Label.new()
-	season.text = "2026  /  MOTORSPORT"
+	season.text = "2026  /  FORMULA RACING"
 	season.add_theme_font_size_override("font_size", 10)
-	season.add_theme_color_override("font_color", Color(0.42, 0.65, 0.91))
+	season.add_theme_color_override("font_color", Color(0.98, 0.25, 0.28))
 	side_column.add_child(season)
 	var separator := HSeparator.new()
 	side_column.add_child(separator)
@@ -262,13 +347,13 @@ func _build_menu() -> void:
 	var header := HBoxContainer.new()
 	content_column.add_child(header)
 	var heading := Label.new()
-	heading.text = "WORLD OF RACING"
+	heading.text = "THE PADDOCK  /  CAREER HUB"
 	heading.add_theme_font_size_override("font_size", 13)
 	heading.add_theme_color_override("font_color", Color(0.56, 0.72, 0.94))
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(heading)
 	var status := Label.new()
-	status.text = "OFFLINE  •  SINGLE PLAYER"
+	status.text = "SINGLE PLAYER  •  READY TO RACE"
 	status.add_theme_font_size_override("font_size", 10)
 	status.add_theme_color_override("font_color", Color(0.65, 0.76, 0.87))
 	header.add_child(status)
@@ -283,20 +368,20 @@ func _build_menu() -> void:
 	page_host.add_child(home)
 	pages["HOME"] = home
 	var welcome := Label.new()
-	welcome.text = "WELCOME TO APEX RACING"
-	welcome.add_theme_font_size_override("font_size", 29)
+	welcome.text = "APEX RACING"
+	welcome.add_theme_font_size_override("font_size", 36)
 	welcome.add_theme_color_override("font_color", Color(0.94, 0.96, 1.0))
 	home.add_child(welcome)
 	var tagline := Label.new()
-	tagline.text = "Your grid. Your era. Your race."
+	tagline.text = "THE GRID IS YOURS. MAKE EVERY LAP COUNT."
 	tagline.add_theme_font_size_override("font_size", 15)
 	tagline.add_theme_color_override("font_color", Color(0.62, 0.72, 0.85))
 	home.add_child(tagline)
 	var hero := PanelContainer.new()
 	hero.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var hero_style := StyleBoxFlat.new()
-	hero_style.bg_color = Color(0.035, 0.075, 0.13, 0.98)
-	hero_style.border_color = Color(0.12, 0.38, 0.72, 0.9)
+	hero_style.bg_color = Color(0.075, 0.086, 0.11, 0.99)
+	hero_style.border_color = Color(0.9, 0.16, 0.19, 0.95)
 	hero_style.set_border_width_all(1)
 	hero_style.set_corner_radius_all(8)
 	hero.add_theme_stylebox_override("panel", hero_style)
@@ -310,27 +395,27 @@ func _build_menu() -> void:
 	round_label.add_theme_color_override("font_color", Color(0.4, 0.68, 1.0))
 	hero_content.add_child(round_label)
 	var hero_title := Label.new()
-	hero_title.text = "TAKE YOUR PLACE\nON THE GRID"
-	hero_title.add_theme_font_size_override("font_size", 32)
+	hero_title.text = "LIGHTS OUT.\nHUNT THE LIMIT."
+	hero_title.add_theme_font_size_override("font_size", 42)
 	hero_title.add_theme_color_override("font_color", Color(0.97, 0.98, 1.0))
 	hero_content.add_child(hero_title)
 	var hero_desc := Label.new()
-	hero_desc.text = "Choose a team, pick your generation of Formula car and race a full 22-car field."
+	hero_desc.text = "Choose your team and driver, build your setup, then fight through qualifying and an eight-lap Grand Prix against a full 22-car field."
 	hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hero_desc.add_theme_color_override("font_color", Color(0.68, 0.77, 0.88))
 	hero_content.add_child(hero_desc)
 	var setup_button := Button.new()
-	setup_button.text = "RACE WEEKEND  →"
+	setup_button.text = "ENTER RACE WEEKEND  →"
 	setup_button.custom_minimum_size = Vector2(0, 48)
 	setup_button.pressed.connect(func(): _set_menu_page(pages, "RACE"))
 	hero_content.add_child(setup_button)
 	var quick_button := Button.new()
-	quick_button.text = "QUICK RACE  —  CURRENT SELECTION"
+	quick_button.text = "QUICK GRAND PRIX  →"
 	quick_button.custom_minimum_size = Vector2(0, 42)
 	quick_button.pressed.connect(_start_race)
 	hero_content.add_child(quick_button)
 	var practice_button := Button.new()
-	practice_button.text = "PRACTICE VS AI  —  5 LAPS"
+	practice_button.text = "PRACTICE SESSION  ·  5 LAPS"
 	practice_button.custom_minimum_size = Vector2(0, 42)
 	practice_button.pressed.connect(_start_race.bind("PRACTICE"))
 	hero_content.add_child(practice_button)
@@ -340,7 +425,7 @@ func _build_menu() -> void:
 	championship_button.pressed.connect(_start_championship)
 	hero_content.add_child(championship_button)
 	var footer := Label.new()
-	footer.text = "11 TEAMS     22 DRIVERS     %d CIRCUITS     4 CAR GENERATIONS" % TRACKS.size()
+	footer.text = "11 TEAMS     /     22 DRIVERS     /     %d CIRCUITS     /     4 CAR ERAS" % TRACKS.size()
 	footer.add_theme_color_override("font_color", Color(0.65, 0.75, 0.87))
 	home.add_child(footer)
 
@@ -497,8 +582,8 @@ func _build_menu() -> void:
 
 	for page_name in ["HOME", "RACE", "GARAGE", "SETTINGS"]:
 		var nav := Button.new()
-		nav.text = page_name
-		nav.custom_minimum_size = Vector2(0, 44)
+		nav.text = "HOME" if page_name == "HOME" else ("RACE WEEKEND" if page_name == "RACE" else ("GARAGE" if page_name == "GARAGE" else "SETTINGS"))
+		nav.custom_minimum_size = Vector2(0, 48)
 		nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nav.pressed.connect(func(): _set_menu_page(pages, page_name))
 		side_column.add_child(nav)
@@ -557,7 +642,12 @@ func _start_race(mode: String = "RACE") -> void:
 	if is_instance_valid(race_flag_label):
 		race_flag_label.text = "GREEN FLAG"
 	_apply_graphics_quality()
+	var loading_overlay := _show_loading_overlay()
+	await get_tree().process_frame
 	menu_layer.queue_free()
+	if not environment_built:
+		_build_environment()
+		environment_built = true
 	_build_track(selected_track)
 	_build_player()
 	_apply_car_performance()
