@@ -66,6 +66,39 @@ const CHAMPIONSHIP_SAVE_PATH := "user://apex_championship.cfg"
 var selected_tyre_compound := "MEDIUM"
 var tyre_label: Label
 var systems_label: Label
+var engineer_label: Label
+var gap_label: Label
+var setup_label: Label
+var engineer_message := "Radio check. All systems ready."
+var engineer_cooldown := 0.0
+var last_reported_position := 1
+var pit_dialog_open := false
+var pit_alert_damage := false
+var pit_alert_tyres := false
+var pit_alert_fuel := false
+var race_phase := "IDLE"
+var main_race_lap_limit := 3
+var qualifying_best_lap := INF
+var qualifying_lap_start_time := 0.0
+var qualifying_grid_position := 1
+var track_setup: Dictionary = {}
+const TRACK_SETUP_PRESETS := {
+	"Apex GP Oval": {"brake_bias": 56.0, "aero": 22.0, "front_wing": 18.0, "rear_wing": 22.0},
+	"Desert Ring": {"brake_bias": 57.0, "aero": 64.0, "front_wing": 60.0, "rear_wing": 66.0},
+	"Harbor Grand Prix": {"brake_bias": 55.0, "aero": 84.0, "front_wing": 84.0, "rear_wing": 90.0},
+	"Monaco Street Circuit": {"brake_bias": 54.0, "aero": 96.0, "front_wing": 96.0, "rear_wing": 100.0},
+	"Silverstone GP": {"brake_bias": 56.0, "aero": 72.0, "front_wing": 70.0, "rear_wing": 74.0},
+	"Monza": {"brake_bias": 58.0, "aero": 28.0, "front_wing": 24.0, "rear_wing": 30.0},
+	"Spa-Francorchamps": {"brake_bias": 56.0, "aero": 56.0, "front_wing": 52.0, "rear_wing": 60.0},
+	"Suzuka": {"brake_bias": 56.0, "aero": 74.0, "front_wing": 72.0, "rear_wing": 78.0},
+	"Bahrain International": {"brake_bias": 57.0, "aero": 58.0, "front_wing": 54.0, "rear_wing": 62.0},
+	"Singapore Marina Bay": {"brake_bias": 54.0, "aero": 94.0, "front_wing": 92.0, "rear_wing": 98.0},
+	"Albert Park": {"brake_bias": 55.0, "aero": 74.0, "front_wing": 72.0, "rear_wing": 78.0},
+	"Interlagos": {"brake_bias": 56.0, "aero": 66.0, "front_wing": 63.0, "rear_wing": 69.0},
+	"Zandvoort": {"brake_bias": 55.0, "aero": 84.0, "front_wing": 82.0, "rear_wing": 88.0},
+	"Imola": {"brake_bias": 56.0, "aero": 62.0, "front_wing": 59.0, "rear_wing": 66.0},
+	"Portimao": {"brake_bias": 56.0, "aero": 72.0, "front_wing": 69.0, "rear_wing": 75.0}
+}
 var race_started := false
 var countdown_remaining := 3.0
 var race_active := false
@@ -453,11 +486,17 @@ func _start_race(mode: String = "RACE") -> void:
 	race_mode = mode
 	if race_mode == "CHAMPIONSHIP":
 		selected_track = (championship_base_track + championship_round) % TRACKS.size()
-	race_lap_limit = 5 if race_mode == "PRACTICE" or race_mode == "CHAMPIONSHIP" else 3
+	main_race_lap_limit = 5 if race_mode == "PRACTICE" or race_mode == "CHAMPIONSHIP" else 3
+	race_lap_limit = 2
+	race_phase = "QUALIFYING"
+	qualifying_best_lap = INF
+	qualifying_lap_start_time = 0.0
+	qualifying_grid_position = 1
 	race_started = true
 	_apply_graphics_quality()
 	menu_layer.queue_free()
 	_build_track(selected_track)
+	_apply_track_setup()
 	_build_player()
 	player.tyre_compound = selected_tyre_compound
 	_build_ai()
@@ -465,7 +504,8 @@ func _start_race(mode: String = "RACE") -> void:
 	player.controls_enabled = false
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		opponent.set_process(false)
-	race_status_label.text = ("CHAMPIONSHIP  •  ROUND %d/%d  •  GET READY" % [championship_round + 1, championship_rounds]) if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  GET READY  3" if race_mode == "PRACTICE" else "GET READY  3")
+	engineer_message = "Two timed laps. Push when the lights go green."
+	race_status_label.text = "QUALIFYING  •  TWO LAPS  •  GET READY"
 
 func _build_track(track_index: int) -> void:
 	var points: Array[Vector3] = []
@@ -1063,35 +1103,40 @@ func _hud_style(fill: Color, edge: Color) -> StyleBoxFlat:
 func _process(delta: float) -> void:
 	if not race_started or race_finished:
 		return
+	if Input.is_action_just_pressed("pit_request") and race_active:
+		_open_pit_strategy("Your request")
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
-			var countdown_text := "CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "GET READY  %d" % int(ceil(countdown_remaining)))
+			var countdown_text := "QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining)))
 			race_status_label.text = countdown_text
 		else:
 			race_active = true
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
-			race_status_label.text = "PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"
+			race_status_label.text = "QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!")
 		return
 	elapsed += delta
 	if is_instance_valid(player):
-		speed_label.text = "Speed  %03d km/h\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
+		speed_label.text = "Speed  %03d km/h\\nSession time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
 		_update_sector_timing(delta)
 		_update_leaderboard()
 		var current_track_index := max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
-		systems_label.text = "FUEL  %02d%%" % int(player.fuel_remaining)
+		systems_label.text = "FUEL  %02d%%  •  DAMAGE %02d%%" % [int(player.fuel_remaining), int(player.damage)]
 		drs_label.text = "DRS  •  ACTIVE" if player.drs_active else ("DRS  •  AVAILABLE" if player.drs_zone else "DRS  •  DISABLED")
 		drs_label.add_theme_color_override("font_color", Color(0.28, 0.95, 0.66) if player.drs_active else Color(0.62, 0.69, 0.76))
 		var progress := _player_progress_score()
 		var position := _get_player_position(progress)
-		lap_label.text = "LAP  %d / %d" % [min(player_laps + 1, race_lap_limit), race_lap_limit]
+		lap_label.text = "LAP  %d / %d" % [max(1, min(player_laps + 1, race_lap_limit)), race_lap_limit]
 		position_label.text = "P %02d" % position
-		if player_laps >= race_lap_limit:
+		_update_engineer(delta)
+		if race_phase == "QUALIFYING" and player_laps >= 2:
+			_finish_qualifying()
+		elif race_phase == "RACE" and player_laps >= race_lap_limit:
 			_finish_race()
 
 func _update_sector_timing(delta: float) -> void:
