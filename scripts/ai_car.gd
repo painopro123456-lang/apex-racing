@@ -83,7 +83,7 @@ func _process(delta: float) -> void:
 	else:
 		overtake_offset = move_toward(overtake_offset, 0.0, LANE_CHANGE_SPEED * delta)
 
-	var desired_lane := clamp(base_lane + overtake_offset, -TRACK_HALF_WIDTH + 1.2, TRACK_HALF_WIDTH - 1.2)
+	var desired_lane: float = clamp(base_lane + overtake_offset, -TRACK_HALF_WIDTH + 1.2, TRACK_HALF_WIDTH - 1.2)
 	var target_index := (progress_index + LOOKAHEAD_POINTS) % track_points.size()
 	var target_point := _lane_point(target_index, desired_lane)
 	var to_target := target_point - global_position
