@@ -11,6 +11,11 @@ var steering_rate := 1.9
 var lateral_grip := 8.5
 var rolling_resistance := 1.2
 var aerodynamic_drag := 0.0022
+var brake_bias := 56.0
+var aero_level := 60.0
+var front_wing := 60.0
+var rear_wing := 60.0
+var damage := 0.0
 
 var throttle_input := 0.0
 var brake_input := 0.0
@@ -42,15 +47,16 @@ func _physics_process(delta: float) -> void:
 	# Braking while moving forward slows the car; braking at a standstill selects reverse.
 	if throttle_input > 0.01:
 		if forward_speed < -0.5:
-			forward_speed = move_toward(forward_speed, 0.0, braking * delta)
+			forward_speed = move_toward(forward_speed, 0.0, braking * _brake_effectiveness() * delta)
 		else:
 			var fuel_power := 0.55 if fuel_remaining <= 0.0 else lerp(0.72, 1.0, fuel_remaining / 100.0)
+			fuel_power *= clamp(1.0 - damage * 0.0035, 0.62, 1.0)
 			var ers_power := 8.0 if ers_requested else 0.0
 			var speed_cap := max_speed + (8.0 if drs_active else 0.0) + ers_power
 			forward_speed = move_toward(forward_speed, speed_cap, (acceleration * fuel_power + ers_power * 0.9) * delta * throttle_input)
 	elif brake_input > 0.01:
 		if forward_speed > 0.5:
-			forward_speed = move_toward(forward_speed, 0.0, braking * delta * brake_input)
+			forward_speed = move_toward(forward_speed, 0.0, braking * _brake_effectiveness() * delta * brake_input)
 		else:
 			forward_speed = move_toward(forward_speed, -reverse_speed, acceleration * 0.48 * delta * brake_input)
 	else:
@@ -58,12 +64,15 @@ func _physics_process(delta: float) -> void:
 
 	# Aerodynamic drag increases with speed. Downforce improves high-speed cornering grip.
 	var drag_factor := 0.78 if drs_active else 1.0
-	var drag := aerodynamic_drag * drag_factor * forward_speed * forward_speed
+	var wing_drag := lerp(0.82, 1.35, aero_level / 100.0) * lerp(0.90, 1.16, (front_wing + rear_wing) / 200.0)
+	var drag := aerodynamic_drag * wing_drag * drag_factor * forward_speed * forward_speed
 	forward_speed = move_toward(forward_speed, 0.0, drag * delta)
 	var downforce_grip := min(abs(forward_speed) * 0.055, 4.0)
 	var compound_grip := 1.08 if tyre_compound == "SOFT" else (0.92 if tyre_compound == "HARD" else 1.0)
 	var wear_grip := lerp(0.58, 1.0, tyre_wear / 100.0)
-	var available_grip := (lateral_grip + downforce_grip) * compound_grip * wear_grip
+	var wing_grip := lerp(0.82, 1.22, (front_wing + rear_wing) / 200.0)
+	var damage_grip := clamp(1.0 - damage * 0.0028, 0.68, 1.0)
+	var available_grip := (lateral_grip + downforce_grip) * compound_grip * wear_grip * wing_grip * damage_grip
 	side_speed = move_toward(side_speed, 0.0, available_grip * delta)
 
 	# Steering response builds with speed, while very high speed slightly limits yaw rate.
@@ -94,8 +103,13 @@ func _physics_process(delta: float) -> void:
 		tyre_wear = max(0.0, tyre_wear - abs(forward_speed) * delta * wear_rate)
 	move_and_slide()
 
+func _brake_effectiveness() -> float:
+	# A little more front bias improves stability under braking; excessive bias costs stopping performance.
+	return clamp(1.0 - abs(brake_bias - 56.0) * 0.0025, 0.88, 1.0)
+
 func apply_collision(impact_direction: Vector3) -> void:
-	# Basic impact response; detailed damage and deformable physics are future work.
+	# Collision damage reduces power and grip until repaired in the pits.
+	damage = min(100.0, damage + 12.0)
 	var impact := impact_direction.normalized()
 	velocity.x += impact.x * 9.0
 	velocity.z += impact.z * 9.0
