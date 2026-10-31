@@ -50,10 +50,10 @@ func _physics_process(delta: float) -> void:
 		if forward_speed < -0.5:
 			forward_speed = move_toward(forward_speed, 0.0, braking * _brake_effectiveness() * delta)
 		else:
-			var fuel_power := 0.55 if fuel_remaining <= 0.0 else lerp(0.72, 1.0, fuel_remaining / 100.0)
+			var fuel_power: float = 0.55 if fuel_remaining <= 0.0 else lerp(0.72, 1.0, fuel_remaining / 100.0)
 			fuel_power *= clamp(1.0 - damage * 0.0035, 0.62, 1.0)
-			var ers_power := 8.0 if ers_requested else 0.0
-			var speed_cap := max_speed + (8.0 if drs_active else 0.0) + ers_power
+			var ers_power: float = 8.0 if ers_requested else 0.0
+			var speed_cap: float = max_speed + (8.0 if drs_active else 0.0) + ers_power
 			forward_speed = move_toward(forward_speed, speed_cap, (acceleration * fuel_power + ers_power * 0.9) * delta * throttle_input)
 	elif brake_input > 0.01:
 		if forward_speed > 0.5:
@@ -64,22 +64,22 @@ func _physics_process(delta: float) -> void:
 		forward_speed = move_toward(forward_speed, 0.0, rolling_resistance * delta)
 
 	# Aerodynamic drag increases with speed. Downforce improves high-speed cornering grip.
-	var drag_factor := 0.78 if drs_active else 1.0
-	var wing_drag := lerp(0.82, 1.35, aero_level / 100.0) * lerp(0.90, 1.16, (front_wing + rear_wing) / 200.0)
-	var drag := aerodynamic_drag * wing_drag * drag_factor * forward_speed * forward_speed
+	var drag_factor: float = 0.78 if drs_active else 1.0
+	var wing_drag: float = lerp(0.82, 1.35, aero_level / 100.0) * lerp(0.90, 1.16, (front_wing + rear_wing) / 200.0)
+	var drag: float = aerodynamic_drag * wing_drag * drag_factor * forward_speed * forward_speed
 	forward_speed = move_toward(forward_speed, 0.0, drag * delta)
-	var downforce_grip := min(abs(forward_speed) * 0.055, 4.0)
-	var compound_grip := 1.08 if tyre_compound == "SOFT" else (0.92 if tyre_compound == "HARD" else 1.0)
-	var wear_grip := lerp(0.58, 1.0, tyre_wear / 100.0)
-	var wing_grip := lerp(0.82, 1.22, (front_wing + rear_wing) / 200.0)
-	var damage_grip := clamp(1.0 - damage * 0.0028, 0.68, 1.0)
-	var available_grip := (lateral_grip + downforce_grip) * compound_grip * wear_grip * wing_grip * damage_grip
+	var downforce_grip: float = min(abs(forward_speed) * 0.055, 4.0)
+	var compound_grip: float = 1.08 if tyre_compound == "SOFT" else (0.92 if tyre_compound == "HARD" else 1.0)
+	var wear_grip: float = lerp(0.58, 1.0, tyre_wear / 100.0)
+	var wing_grip: float = lerp(0.82, 1.22, (front_wing + rear_wing) / 200.0)
+	var damage_grip: float = clamp(1.0 - damage * 0.0028, 0.68, 1.0)
+	var available_grip: float = (lateral_grip + downforce_grip) * compound_grip * wear_grip * wing_grip * damage_grip
 	side_speed = move_toward(side_speed, 0.0, available_grip * delta)
 
 	# Steering response builds with speed, while very high speed slightly limits yaw rate.
-	var speed_ratio := clamp(abs(forward_speed) / 24.0, 0.0, 1.0)
-	var steering_authority := lerp(0.22, 1.0, speed_ratio)
-	var high_speed_limit := 1.0 / (1.0 + max(abs(forward_speed) - 42.0, 0.0) * 0.018)
+	var speed_ratio: float = clamp(abs(forward_speed) / 24.0, 0.0, 1.0)
+	var steering_authority: float = lerp(0.22, 1.0, speed_ratio)
+	var high_speed_limit: float = 1.0 / (1.0 + max(abs(forward_speed) - 42.0, 0.0) * 0.018)
 	if abs(forward_speed) > 0.8:
 		rotation.y -= steer_input * steering_rate * steering_authority * high_speed_limit * delta * sign(forward_speed)
 
