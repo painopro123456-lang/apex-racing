@@ -1368,7 +1368,8 @@ func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	else:
 		var row := int((qualifying_grid_position - 2) / 2) + 1
 		var phase := fposmod(1.0 - float(row * 4) / float(track_points.size()), 1.0)
-		var start_index := int(phase * track_points.size()) % track_points.size()
+		var row_start := int(phase * track_points.size()) % track_points.size()
+		var start_index := (row_start + (1 if qualifying_grid_position % 2 == 0 else 0)) % track_points.size()
 		var lane := -2.1 if qualifying_grid_position % 2 == 0 else 2.1
 		player.global_position = _track_lane_point(start_index, lane)
 		player_laps = -1
