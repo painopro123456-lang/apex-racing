@@ -1166,14 +1166,29 @@ func _process(delta: float) -> void:
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
-			var countdown_text := "FORMATION LAP  •  %d" % int(ceil(countdown_remaining)) if race_phase == "FORMATION" else ("QUALIFYING  •  %d" % int(ceil(countdown_remaining)) if race_phase == "QUALIFYING" else ("CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))] if race_mode == "CHAMPIONSHIP" else ("PRACTICE  •  %d" % int(ceil(countdown_remaining)) if race_mode == "PRACTICE" else "RACE  •  %d" % int(ceil(countdown_remaining))))
+			var countdown_text := "RACE  •  %d" % int(ceil(countdown_remaining))
+			if race_phase == "FORMATION":
+				countdown_text = "FORMATION LAP  •  %d" % int(ceil(countdown_remaining))
+			elif race_phase == "QUALIFYING":
+				countdown_text = "QUALIFYING  •  %d" % int(ceil(countdown_remaining))
+			elif race_mode == "CHAMPIONSHIP":
+				countdown_text = "CHAMPIONSHIP  •  ROUND %d/%d  •  %d" % [championship_round + 1, championship_rounds, int(ceil(countdown_remaining))]
+			elif race_mode == "PRACTICE":
+				countdown_text = "PRACTICE  •  %d" % int(ceil(countdown_remaining))
 			race_status_label.text = countdown_text
 		else:
 			race_active = true
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
-			race_status_label.text = "FORMATION LAP  •  FOLLOW THE PACK" if race_phase == "FORMATION" else ("QUALIFYING  •  GO!" if race_phase == "QUALIFYING" else ("PRACTICE  •  GO!" if race_mode == "PRACTICE" else "LIGHTS OUT  •  GO!"))
+			if race_phase == "FORMATION":
+				race_status_label.text = "FORMATION LAP  •  FOLLOW THE PACK"
+			elif race_phase == "QUALIFYING":
+				race_status_label.text = "QUALIFYING  •  GO!"
+			elif race_mode == "PRACTICE":
+				race_status_label.text = "PRACTICE  •  GO!"
+			else:
+				race_status_label.text = "LIGHTS OUT  •  GO!"
 		return
 	elapsed += delta
 	if is_instance_valid(player):
