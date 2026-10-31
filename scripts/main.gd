@@ -510,6 +510,32 @@ func _car_visual(parent: Node3D, color: Color, team_index: int) -> void:
 	for x in [-0.98, 0.98]:
 		for z in [-1.65, 1.35]:
 			_add_car_cylinder(parent, 0.245, 0.358, Vector3(x * 1.01, 0.34, z), dark_trim)
+	# Lightweight 3D sponsor wordmarks on the sidepods and upper body.
+	var sponsors: Array = TEAM_SPONSORS[team_index]
+	var primary_ink := Color(0.98, 0.98, 0.96)
+	var accent_ink := color.lightened(0.48)
+	for side in [-1.0, 1.0]:
+		_add_sponsor_decal(parent, str(sponsors[0]), Vector3(side * 1.005, 0.47, 0.18), Vector3(0, side * PI / 2.0, 0), primary_ink, 0.0042, 25)
+		_add_sponsor_decal(parent, str(sponsors[1]), Vector3(side * 0.77, 0.625, 0.13), Vector3(-PI / 2.0, 0, 0), accent_ink, 0.0032, 18)
+		_add_sponsor_decal(parent, str(sponsors[2]), Vector3(side * 1.005, 0.47, 0.92), Vector3(0, side * PI / 2.0, 0), primary_ink, 0.0027, 16)
+	_add_sponsor_decal(parent, str(sponsors[0]), Vector3(0, 0.505, -1.95), Vector3(-PI / 2.0, 0, 0), primary_ink, 0.0034, 22)
+	_add_sponsor_decal(parent, str(sponsors[3]), Vector3(0, 0.73, 0.55), Vector3(-PI / 2.0, 0, 0), primary_ink, 0.0028, 16)
+
+func _add_sponsor_decal(parent: Node3D, brand: String, pos: Vector3, rot: Vector3, ink: Color, pixel_scale: float, size: int) -> void:
+	var decal := Label3D.new()
+	decal.text = brand
+	decal.font_size = size
+	decal.pixel_size = pixel_scale
+	decal.modulate = ink
+	decal.outline_size = 3
+	decal.outline_modulate = Color(0.015, 0.02, 0.03, 0.95)
+	decal.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+	decal.no_depth_test = false
+	decal.position = pos
+	decal.rotation = rot
+	decal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	decal.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	parent.add_child(decal)
 
 func _add_car_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, color: Color) -> void:
 	var node := MeshInstance3D.new()
