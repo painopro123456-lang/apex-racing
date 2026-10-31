@@ -1284,10 +1284,10 @@ func _show_championship_continue() -> void:
 	continue_button.custom_minimum_size = Vector2(0, 44)
 	if championship_round + 1 < championship_rounds:
 		continue_button.text = "CONTINUE TO NEXT ROUND"
-		continue_button.pressed.connect(func(): layer.queue_free(); _advance_championship())
+		continue_button.pressed.connect(_advance_championship)
 	else:
 		continue_button.text = "FINISH SEASON"
-		continue_button.pressed.connect(func(): layer.queue_free(); _complete_championship())
+		continue_button.pressed.connect(_complete_championship)
 	column.add_child(continue_button)
 
 func _complete_championship() -> void:
