@@ -35,5 +35,5 @@ ers_boost={
 }
 drs={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":81)]
+"events": [Object(InputEventKey,"physical_keycode":4194325)]
 }
