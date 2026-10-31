@@ -74,7 +74,7 @@ func reset_to_grid(grid_position: int) -> void:
 func _process(delta: float) -> void:
 	if track_points.size() < 4:
 		return
-	var avoid := _find_nearby_opponent()
+	var avoid := 0.0 if caution_mode else _find_nearby_opponent()
 	if avoid != 0.0:
 		overtake_offset = move_toward(overtake_offset, avoid, LANE_CHANGE_SPEED * delta)
 		overtake_timer = 1.0
