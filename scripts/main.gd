@@ -124,6 +124,8 @@ const TRACK_SETUP_PRESETS := {
 }
 var race_started := false
 var countdown_remaining := 3.0
+var start_light_stage := 0
+var start_light_nodes: Array[ColorRect] = []
 var race_active := false
 var race_finished := false
 var player_laps := 0
@@ -625,7 +627,17 @@ func _build_track(track_index: int) -> void:
 		if i % 8 == 0:
 			_barrier_piece(p1 + lateral * 14.0, p2 + lateral * 14.0, barrier_mat)
 			_barrier_piece(p1 - lateral * 14.0, p2 - lateral * 14.0, barrier_mat)
+			for side in [-1.0, 1.0]:
+				var wall_body := CollisionShape3D.new()
+				var wall_shape := BoxShape3D.new()
+				wall_shape.size = Vector3(1.0, 2.0, p1.distance_to(p2) * 8.0 + 0.5)
+				wall_body.shape = wall_shape
+				wall_body.position = (p1 + p2) * 0.5 + lateral * side * 10.0 + Vector3(0, 0.8, 0)
+				wall_body.rotation.y = atan2(-direction.x, -direction.z)
+				road_physics.add_child(wall_body)
 
+	_add_track_ribbon(points, 7.18, 7.42, 0.16, _mat(Color(0.96, 0.96, 0.91)))
+	_add_track_ribbon(points, -7.42, -7.18, 0.16, _mat(Color(0.96, 0.96, 0.91)))
 	_add_start_finish_line(points, road_mat)
 	_add_trackside_scenery(points)
 	_add_pit_lane(points, road_mat)
@@ -1249,7 +1261,7 @@ func _build_hud() -> void:
 	status_col.add_child(drs_label)
 	tyre_label = _hud_label("TYRE  MEDIUM  •  100%", 13, Color.WHITE)
 	status_col.add_child(tyre_label)
-	systems_label = _hud_label("FUEL  100%  •  DAMAGE 00%", 13, Color(0.78, 0.84, 0.9))
+	systems_label = _hud_label("DAMAGE 00%  •  ERS 100%", 13, Color(0.78, 0.84, 0.9))
 	status_col.add_child(systems_label)
 	setup_label = _hud_label("SETUP  •  BB 56%  AERO 22  FW 18  RW 22", 10, Color(0.65, 0.75, 0.87))
 	status_col.add_child(setup_label)
@@ -1278,6 +1290,33 @@ func _build_hud() -> void:
 	engineer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	engineer_col.add_child(engineer_label)
 
+	var gantry := PanelContainer.new()
+	gantry.anchor_left = 0.5
+	gantry.anchor_right = 0.5
+	gantry.offset_left = -118
+	gantry.offset_right = 118
+	gantry.offset_top = 66
+	gantry.offset_bottom = 122
+	gantry.add_theme_stylebox_override("panel", _hud_style(Color(0.012, 0.014, 0.02, 0.96), Color(0.42, 0.45, 0.5, 1.0)))
+	root.add_child(gantry)
+	var gantry_row := HBoxContainer.new()
+	gantry_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	gantry_row.add_theme_constant_override("separation", 13)
+	gantry.add_child(gantry_row)
+	start_light_nodes.clear()
+	for light_index in range(5):
+		var lamp := ColorRect.new()
+		lamp.custom_minimum_size = Vector2(27, 27)
+		lamp.color = Color(0.12, 0.015, 0.02)
+		var lamp_style := StyleBoxFlat.new()
+		lamp_style.bg_color = lamp.color
+		lamp_style.corner_radius_top_left = 14
+		lamp_style.corner_radius_top_right = 14
+		lamp_style.corner_radius_bottom_left = 14
+		lamp_style.corner_radius_bottom_right = 14
+		lamp.add_theme_stylebox_override("panel", lamp_style)
+		gantry_row.add_child(lamp)
+		start_light_nodes.append(lamp)
 	race_status_label = _hud_label("GET READY", 24, Color(0.98, 0.78, 0.25))
 	race_status_label.anchor_left = 0.5
 	race_status_label.anchor_right = 0.5
@@ -1299,6 +1338,20 @@ func _build_hud() -> void:
 	controls.offset_bottom = -2
 	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(controls)
+
+
+func _update_start_lights(stage: int) -> void:
+	for i in range(start_light_nodes.size()):
+		var lamp: ColorRect = start_light_nodes[i]
+		var active: bool = stage > 0 and i < stage
+		lamp.color = Color(0.95, 0.015, 0.025) if active else Color(0.12, 0.015, 0.02)
+		var style := StyleBoxFlat.new()
+		style.bg_color = lamp.color
+		style.corner_radius_top_left = 14
+		style.corner_radius_top_right = 14
+		style.corner_radius_bottom_left = 14
+		style.corner_radius_bottom_right = 14
+		lamp.add_theme_stylebox_override("panel", style)
 
 func _hud_label(value: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -1336,6 +1389,11 @@ func _process(delta: float) -> void:
 	if not race_active:
 		countdown_remaining -= delta
 		if countdown_remaining > 0.0:
+			if race_phase == "RACE":
+				var next_stage: int = clampi(5 - int(ceil(countdown_remaining)), 0, 5)
+				if next_stage != start_light_stage:
+					start_light_stage = next_stage
+					_update_start_lights(start_light_stage)
 			var countdown_text := "RACE  •  %d" % int(ceil(countdown_remaining))
 			if race_phase == "FORMATION":
 				countdown_text = "FORMATION LAP  •  %d" % int(ceil(countdown_remaining))
@@ -1348,6 +1406,8 @@ func _process(delta: float) -> void:
 			race_status_label.text = countdown_text
 		else:
 			race_active = true
+			if race_phase == "RACE":
+				_update_start_lights(0)
 			player.controls_enabled = true
 			for opponent in get_tree().get_nodes_in_group("ai_cars"):
 				opponent.set_process(true)
@@ -1358,7 +1418,7 @@ func _process(delta: float) -> void:
 			elif race_mode == "PRACTICE":
 				race_status_label.text = "PRACTICE  •  GO!"
 			else:
-				race_status_label.text = "LIGHTS OUT  •  GO!"
+				race_status_label.text = "LIGHTS OUT" if race_phase == "RACE" else "GO!"
 		return
 	elapsed += delta
 	if is_instance_valid(player):
@@ -1377,7 +1437,7 @@ func _process(delta: float) -> void:
 		var current_track_index: int = max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
-		systems_label.text = "FUEL  %02d%%  •  DAMAGE %02d%%" % [int(player.fuel_remaining), int(player.damage)]
+		systems_label.text = "DAMAGE %02d%%  •  ERS %02d%%" % [int(player.damage), int(player.ers_charge)]
 		if is_instance_valid(race_control_label):
 			race_control_label.text = "RACE CONTROL  •  PENALTIES %.0fs  •  LIMITS %d" % [penalty_seconds, track_limit_count]
 		if not track_setup.is_empty():
@@ -1670,7 +1730,8 @@ func _begin_formation_lap(ai_times: Array[Dictionary]) -> void:
 	elapsed = 0.0
 	player_laps = 0
 	player_last_track_index = _nearest_track_index(player.global_position)
-	countdown_remaining = 3.0
+	countdown_remaining = 5.0
+	start_light_stage = 0
 	race_active = false
 	player.max_speed = 30.0
 	player.controls_enabled = false
@@ -1740,7 +1801,6 @@ func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 	qualifying_lap_start_time = 0.0
 	player.tyre_compound = selected_tyre_compound
 	player.tyre_wear = 100.0
-	player.fuel_remaining = 100.0
 	player.ers_charge = 100.0
 	player.damage = 0.0
 	player.velocity = Vector3.ZERO
@@ -1780,7 +1840,8 @@ func _begin_main_race(ai_times: Array[Dictionary]) -> void:
 		engineer_label.text = engineer_message
 	lap_label.text = "LAP  1 / %d" % race_lap_limit
 	position_label.text = "P %02d" % qualifying_grid_position
-	race_status_label.text = "GRID  •  P%02d  •  LIGHTS IN 3" % qualifying_grid_position
+	race_status_label.text = "GRID  •  P%02d  •  PREPARE FOR START" % qualifying_grid_position
+	_update_start_lights(0)
 
 func _gap_to_car_behind() -> Dictionary:
 	var player_score := _player_progress_score()
@@ -1823,10 +1884,6 @@ func _update_engineer(delta: float) -> void:
 		pit_alert_tyres = true
 		engineer_message = "Tyres are heavily worn. Box box. Choose your next compound."
 		_open_pit_strategy("Tyre wear")
-	elif player.fuel_remaining <= 15.0 and not pit_alert_fuel and not pit_dialog_open:
-		pit_alert_fuel = true
-		engineer_message = "Fuel is critical. Box box. Select a compound for the stop."
-		_open_pit_strategy("Fuel")
 	if is_instance_valid(engineer_label):
 		engineer_label.text = engineer_message
 
@@ -1889,7 +1946,7 @@ func _complete_pit_stop(compound: String, layer: CanvasLayer) -> void:
 	pit_alert_damage = false
 	pit_alert_tyres = false
 	pit_alert_fuel = false
-	engineer_message = "Pit stop complete. %s tyres fitted, damage repaired and fuel replenished." % compound
+	engineer_message = "Pit stop complete. %s tyres fitted and damage repaired." % compound
 	engineer_label.text = engineer_message
 	layer.queue_free()
 
