@@ -658,12 +658,12 @@ func _add_trackside_scenery(points: Array[Vector3]) -> void:
 	var foliage_mat := _mat(Color(0.10, 0.29, 0.16))
 	var stand_mat := _mat(Color(0.20, 0.23, 0.29))
 	var seat_mat := _mat(Color(0.78, 0.80, 0.84))
-	var scenery_step := [24, 12, 8, 5][graphics_quality]
+	var scenery_step: int = [24, 12, 8, 5][graphics_quality]
 	for i in range(5, points.size(), scenery_step):
 		var p: Vector3 = points[i]
 		var outward := Vector3(p.x, 0.0, p.z).normalized()
 		for side in [-1.0, 1.0]:
-			var location := p + outward * side * 20.0
+			var location: Vector3 = p + outward * side * 20.0
 			var trunk := MeshInstance3D.new()
 			var trunk_mesh := CylinderMesh.new()
 			trunk_mesh.top_radius = 0.22
@@ -732,7 +732,7 @@ func _add_start_finish_line(points: Array[Vector3], road_material: Material) -> 
 func _add_pit_lane(points: Array[Vector3], road_material: Material) -> void:
 	# A lightweight parallel pit lane beside the opening section of each prototype circuit.
 	var lane_points: Array[Vector3] = []
-	var limit := min(18, points.size() - 1)
+	var limit: int = min(18, points.size() - 1)
 	for i in range(limit + 1):
 		var previous: Vector3 = points[(i - 1 + points.size()) % points.size()]
 		var next_point: Vector3 = points[(i + 1) % points.size()]
@@ -744,7 +744,7 @@ func _add_pit_lane(points: Array[Vector3], road_material: Material) -> void:
 		if i % 2 == 0:
 			_road_piece(lane_points[i] + Vector3(0, 0.12, 0), lane_points[i + 1] + Vector3(0, 0.12, 0), 0.16, _mat(Color(0.92, 0.92, 0.88)))
 	for stall in range(8):
-		var index := min(2 + stall * 2, lane_points.size() - 2)
+		var index: int = min(2 + stall * 2, lane_points.size() - 2)
 		var p: Vector3 = lane_points[index]
 		var p_next: Vector3 = lane_points[index + 1]
 		var box := MeshInstance3D.new()
@@ -1243,7 +1243,7 @@ func _process(delta: float) -> void:
 		_update_player_lap()
 		_update_sector_timing(delta)
 		_update_leaderboard()
-		var current_track_index := max(player_last_track_index, 0)
+		var current_track_index: int = max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
 		systems_label.text = "FUEL  %02d%%  •  DAMAGE %02d%%" % [int(player.fuel_remaining), int(player.damage)]
@@ -1369,7 +1369,7 @@ func _update_track_limits(delta: float) -> void:
 	var nearest_index := _nearest_track_index(player.global_position)
 	var nearest_distance := player.global_position.distance_to(track_points[nearest_index])
 	# 9 m allows for kerbs and the spacing between generated centreline samples.
-	var outside_limits := nearest_distance > 9.0 and abs(player.speed) > 8.0
+	var outside_limits: bool = nearest_distance > 9.0 and abs(player.speed) > 8.0
 	if outside_limits:
 		track_limit_timer += delta
 		if track_limit_timer >= 0.8 and not track_limit_outside:
@@ -1453,8 +1453,8 @@ func _position_after_penalties() -> int:
 		if opponent_score >= player_score:
 			continue
 		var distance_points := player_score - opponent_score
-		var average_speed := max((abs(player.speed) + float(opponent.current_speed)) * 0.5, 12.0)
-		var estimated_gap := distance_points * circuit_length / max(track_points.size(), 1) / average_speed
+		var average_speed: float = max((abs(player.speed) + float(opponent.current_speed)) * 0.5, 12.0)
+		var estimated_gap: float = float(distance_points) * circuit_length / float(max(track_points.size(), 1)) / average_speed
 		if penalty_seconds >= estimated_gap:
 			demotions += 1
 	return clampi(base_position + demotions, base_position, 22)
@@ -1494,7 +1494,7 @@ func _finish_qualifying() -> void:
 	var ai_index := 0
 	for opponent in get_tree().get_nodes_in_group("ai_cars"):
 		var variation := 1.38 + float(ai_index % 7) * 0.045
-		var simulated_time := circuit_length / max(opponent.target_speed * opponent.speed_factor, 12.0) * variation
+		var simulated_time: float = circuit_length / max(opponent.target_speed * opponent.speed_factor, 12.0) * variation
 		ai_times.append({"car": opponent, "time": simulated_time})
 		ai_index += 1
 	ai_times.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -1663,8 +1663,8 @@ func _gap_to_car_behind() -> Dictionary:
 	if closest == null:
 		return {"name": "NONE", "gap": -1.0}
 	var points_behind := player_score - closest_score
-	var average_segment := _track_length() / max(track_points.size(), 1)
-	var average_speed := max((abs(player.speed) + float(closest.current_speed)) * 0.5, 12.0)
+	var average_segment: float = _track_length() / float(max(track_points.size(), 1))
+	var average_speed: float = max((abs(player.speed) + float(closest.current_speed)) * 0.5, 12.0)
 	return {"name": closest.driver_name, "gap": points_behind * average_segment / average_speed}
 
 func _update_engineer(delta: float) -> void:
