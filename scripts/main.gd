@@ -59,6 +59,12 @@ var race_lap_limit := 3
 var race_status_label: Label
 var lap_label: Label
 var position_label: Label
+var leaderboard_rows: Array[Label] = []
+var sector_labels: Array[Label] = []
+var sector_current := 1
+var sector_elapsed := 0.0
+var sector_last_index := -1
+var sector_times: Array[float] = [0.0, 0.0, 0.0]
 
 func _ready() -> void:
 	_build_environment()
@@ -425,21 +431,47 @@ func _build_hud() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(root)
 
-	# Compact race information at the upper left.
-	var info := PanelContainer.new()
-	info.position = Vector2(24, 22)
-	info.custom_minimum_size = Vector2(220, 104)
-	info.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.88), Color(0.25, 0.72, 0.95, 0.9)))
-	root.add_child(info)
-	var info_col := VBoxContainer.new()
-	info_col.add_theme_constant_override("separation", 4)
-	info.add_child(info_col)
-	var driver := _hud_label("%s  /  %s" % [TEAM_NAMES[selected_team], DRIVERS_BY_TEAM[selected_team][selected_driver]], 13, Color(0.66, 0.83, 0.96))
-	info_col.add_child(driver)
-	lap_label = _hud_label("LAP  1 / %d" % race_lap_limit, 20, Color.WHITE)
-	info_col.add_child(lap_label)
-	position_label = _hud_label("POSITION  01 / 22", 16, Color(0.95, 0.78, 0.28))
-	info_col.add_child(position_label)
+	# Live timing tower at the upper left.
+	var board := PanelContainer.new()
+	board.position = Vector2(24, 22)
+	board.custom_minimum_size = Vector2(218, 0)
+	board.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.9), Color(0.25, 0.72, 0.95, 0.9)))
+	root.add_child(board)
+	var board_col := VBoxContainer.new()
+	board_col.add_theme_constant_override("separation", 3)
+	board.add_child(board_col)
+	var board_title := _hud_label("LIVE TIMING  /  22 CARS", 12, Color(0.55, 0.78, 0.94))
+	board_col.add_child(board_title)
+	lap_label = _hud_label("LAP  1 / %d" % race_lap_limit, 15, Color.WHITE)
+	board_col.add_child(lap_label)
+	position_label = _hud_label("P 01", 12, Color(0.95, 0.78, 0.28))
+	board_col.add_child(position_label)
+	var board_divider := HSeparator.new()
+	board_col.add_child(board_divider)
+	for row_index in range(22):
+		var row := _hud_label("%02d   ---" % (row_index + 1), 11, Color(0.82, 0.87, 0.93))
+		row.custom_minimum_size.y = 14
+		board_col.add_child(row)
+		leaderboard_rows.append(row)
+
+	# Sector timing card in the upper right.
+	var sectors := PanelContainer.new()
+	sectors.anchor_left = 1.0
+	sectors.anchor_right = 1.0
+	sectors.offset_left = -205
+	sectors.offset_right = -24
+	sectors.offset_top = 22
+	sectors.offset_bottom = 145
+	sectors.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.9), Color(0.25, 0.72, 0.95, 0.9)))
+	root.add_child(sectors)
+	var sectors_col := VBoxContainer.new()
+	sectors_col.add_theme_constant_override("separation", 7)
+	sectors.add_child(sectors_col)
+	sectors_col.add_child(_hud_label("SECTOR TIMES", 12, Color(0.55, 0.78, 0.94)))
+	for sector_index in range(3):
+		var sector_row := _hud_label("S%d     --:--.---" % (sector_index + 1), 15, Color.WHITE)
+		sectors_col.add_child(sector_row)
+		sector_labels.append(sector_row)
 
 	# Bottom-centre telemetry pod, inspired by modern single-seater race displays.
 	var telemetry := PanelContainer.new()
@@ -502,8 +534,8 @@ func _build_hud() -> void:
 	status.anchor_right = 1.0
 	status.offset_left = -205
 	status.offset_right = -24
-	status.offset_top = 22
-	status.offset_bottom = 116
+	status.offset_top = 158
+	status.offset_bottom = 252
 	status.add_theme_stylebox_override("panel", _hud_style(Color(0.018, 0.027, 0.043, 0.88), Color(0.25, 0.72, 0.95, 0.9)))
 	root.add_child(status)
 	var status_col := VBoxContainer.new()
@@ -575,6 +607,8 @@ func _process(delta: float) -> void:
 	if is_instance_valid(player):
 		speed_label.text = "Speed  %03d km/h\nRace time  %05.1f s" % [int(abs(player.speed) * 3.6), elapsed]
 		_update_player_lap()
+		_update_sector_timing(delta)
+		_update_leaderboard()
 		var current_track_index := max(player_last_track_index, 0)
 		player.drs_zone = current_track_index >= 8 and current_track_index <= 25
 		tyre_label.text = "TYRES  %s  •  %02d%%" % [player.tyre_compound, int(player.tyre_wear)]
@@ -584,9 +618,68 @@ func _process(delta: float) -> void:
 		var progress := _player_progress_score()
 		var position := _get_player_position(progress)
 		lap_label.text = "LAP  %d / %d" % [min(player_laps + 1, race_lap_limit), race_lap_limit]
-		position_label.text = "POSITION  %02d / 22" % position
+		position_label.text = "P %02d" % position
 		if player_laps >= race_lap_limit:
 			_finish_race()
+
+func _update_sector_timing(delta: float) -> void:
+	if track_points.is_empty():
+		return
+	sector_elapsed += delta
+	var current_index := _nearest_track_index(player.global_position)
+	if sector_last_index < 0:
+		sector_last_index = current_index
+		return
+	var count := track_points.size()
+	var crossed := false
+	if sector_current == 1 and sector_last_index < int(count / 3.0) and current_index >= int(count / 3.0):
+		crossed = true
+	elif sector_current == 2 and sector_last_index < int(count * 2.0 / 3.0) and current_index >= int(count * 2.0 / 3.0):
+		crossed = true
+	elif sector_current == 3 and sector_last_index > int(count * 0.8) and current_index < int(count * 0.2):
+		crossed = true
+	if crossed:
+		sector_times[sector_current - 1] = sector_elapsed
+		sector_labels[sector_current - 1].text = "S%d     %s" % [sector_current, _format_sector_time(sector_elapsed)]
+		sector_labels[sector_current - 1].add_theme_color_override("font_color", Color(0.28, 0.95, 0.66))
+		sector_current = 1 if sector_current == 3 else sector_current + 1
+		sector_elapsed = 0.0
+		sector_labels[sector_current - 1].text = "S%d     LIVE" % sector_current
+		sector_labels[sector_current - 1].add_theme_color_override("font_color", Color(0.98, 0.78, 0.25))
+	sector_last_index = current_index
+
+func _format_sector_time(value: float) -> String:
+	var minutes := int(value / 60.0)
+	var seconds := fposmod(value, 60.0)
+	return "%02d:%06.3f" % [minutes, seconds]
+
+func _update_leaderboard() -> void:
+	var standings: Array[Dictionary] = []
+	standings.append({
+		"name": DRIVERS_BY_TEAM[selected_team][selected_driver],
+		"team": TEAM_NAMES[selected_team],
+		"progress": _player_progress_score(),
+		"is_player": true
+	})
+	for opponent in get_tree().get_nodes_in_group("ai_cars"):
+		standings.append({
+			"name": opponent.driver_name,
+			"team": "",
+			"progress": float(opponent.completed_laps * track_points.size() + opponent.progress_index),
+			"is_player": false
+		})
+	standings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["progress"]) > float(b["progress"])
+	)
+	for i in range(min(standings.size(), leaderboard_rows.size())):
+		var entry: Dictionary = standings[i]
+		var driver_name: String = str(entry["name"])
+		var short_name := driver_name.to_upper()
+		var parts := short_name.split(" ")
+		var display_name := parts[parts.size() - 1] if parts.size() > 0 else short_name
+		leaderboard_rows[i].text = "%02d   %s%s" % [i + 1, display_name, "  YOU" if bool(entry["is_player"]) else ""]
+		leaderboard_rows[i].add_theme_color_override("font_color", Color(0.35, 0.82, 1.0) if bool(entry["is_player"]) else Color(0.82, 0.87, 0.93))
+	position_label.text = "P %02d" % (_get_player_position(_player_progress_score()))
 
 func _nearest_track_index(position: Vector3) -> int:
 	var nearest_index := 0
