@@ -349,13 +349,47 @@ func _build_ai() -> void:
 			grid_index += 1
 
 func _car_visual(parent: Node3D, color: Color) -> void:
-	_add_car_box(parent, Vector3(1.5, 0.38, 3.6), Vector3(0, 0.36, 0), color)
-	_add_car_box(parent, Vector3(0.55, 0.2, 1.45), Vector3(0, 0.34, -2.0), color.lightened(0.12))
-	_add_car_box(parent, Vector3(2.0, 0.12, 0.45), Vector3(0, 0.22, -2.65), Color(0.02, 0.025, 0.035))
-	_add_car_box(parent, Vector3(2.0, 0.5, 0.32), Vector3(0, 0.72, 1.35), Color(0.02, 0.025, 0.035))
-	for x in [-0.88, 0.88]:
-		for z in [-1.05, 1.12]:
-			_add_car_box(parent, Vector3(0.36, 0.46, 0.76), Vector3(x, 0.25, z), Color(0.012, 0.014, 0.018))
+	# Lightweight low-poly open-wheel car: nose, sidepods, cockpit, halo, wings and tyres.
+	var carbon := Color(0.018, 0.022, 0.03)
+	var tyre := Color(0.012, 0.014, 0.018)
+	var rim := Color(0.32, 0.36, 0.42)
+	_add_car_box(parent, Vector3(1.12, 0.28, 2.65), Vector3(0, 0.34, 0.05), color)
+	_add_car_box(parent, Vector3(0.48, 0.22, 2.0), Vector3(0, 0.34, -1.92), color.lightened(0.12))
+	_add_car_box(parent, Vector3(0.72, 0.22, 1.05), Vector3(0, 0.48, 0.9), color.darkened(0.12))
+	for x in [-0.72, 0.72]:
+		_add_car_box(parent, Vector3(0.55, 0.42, 1.45), Vector3(x, 0.38, 0.15), color.darkened(0.08))
+		_add_car_box(parent, Vector3(0.12, 0.16, 0.95), Vector3(x * 1.25, 0.48, 0.15), carbon)
+	_add_car_box(parent, Vector3(2.15, 0.12, 0.48), Vector3(0, 0.2, -2.75), carbon)
+	_add_car_box(parent, Vector3(2.0, 0.055, 0.28), Vector3(0, 0.29, -2.62), color)
+	for x in [-1.02, 1.02]:
+		_add_car_box(parent, Vector3(0.1, 0.38, 0.5), Vector3(x, 0.35, -2.72), color)
+	_add_car_box(parent, Vector3(1.9, 0.12, 0.42), Vector3(0, 0.88, 1.72), carbon)
+	_add_car_box(parent, Vector3(1.75, 0.08, 0.32), Vector3(0, 1.08, 1.72), color)
+	for x in [-0.72, 0.72]:
+		_add_car_box(parent, Vector3(0.1, 0.55, 0.36), Vector3(x, 0.72, 1.72), color)
+	_add_car_box(parent, Vector3(1.0, 0.12, 0.5), Vector3(0, 0.22, 1.55), carbon)
+	_add_car_box(parent, Vector3(0.56, 0.22, 0.78), Vector3(0, 0.63, -0.62), carbon)
+	_add_car_box(parent, Vector3(0.075, 0.12, 0.9), Vector3(0, 0.84, -0.66), rim)
+	_add_car_box(parent, Vector3(0.72, 0.07, 0.075), Vector3(0, 0.88, -0.25), rim)
+	for x in [-0.34, 0.34]:
+		_add_car_box(parent, Vector3(0.07, 0.16, 0.08), Vector3(x, 0.82, -0.26), rim)
+	for x in [-0.98, 0.98]:
+		for z in [-1.65, 1.35]:
+			_add_car_cylinder(parent, 0.48, 0.34, Vector3(x, 0.34, z), tyre)
+			_add_car_cylinder(parent, 0.22, 0.355, Vector3(x * 1.01, 0.34, z), rim)
+
+func _add_car_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, color: Color) -> void:
+	var node := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	mesh.radial_segments = 12
+	node.mesh = mesh
+	node.material_override = _mat(color)
+	node.position = pos
+	node.rotation.z = PI / 2.0
+	parent.add_child(node)
 
 func _add_car_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> void:
 	var node := MeshInstance3D.new()
