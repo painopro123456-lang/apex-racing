@@ -26,7 +26,13 @@ func _ready() -> void:
 	add_to_group("ai_cars")
 	if track_points.size() > 0:
 		progress_index = int(fposmod(phase, 1.0) * track_points.size()) % track_points.size()
-		global_position = track_points[progress_index]
+		global_position = _lane_point(progress_index, base_lane)
+		var previous: Vector3 = track_points[(progress_index - 1 + track_points.size()) % track_points.size()]
+		var next_point: Vector3 = track_points[(progress_index + 1) % track_points.size()]
+		var tangent := (next_point - previous).normalized()
+		rotation.y = atan2(-tangent.x, -tangent.z)
+		# Grid cars begin on the previous lap, just before crossing the timing line.
+		completed_laps = -1 if phase > 0.5 else 0
 	collision_area = Area3D.new()
 	collision_area.collision_layer = 0
 	collision_area.collision_mask = 1
@@ -66,7 +72,7 @@ func _process(delta: float) -> void:
 	var forward := -global_transform.basis.z
 	global_position += forward * current_speed * delta
 	global_position.y = 0.45
-	_advance_progress()
+	_advance_progress(desired_lane)
 
 func _lane_point(index: int, offset: float) -> Vector3:
 	var centre: Vector3 = track_points[index]
@@ -76,10 +82,11 @@ func _lane_point(index: int, offset: float) -> Vector3:
 	var lateral := Vector3(-tangent.z, 0.0, tangent.x)
 	return centre + lateral * offset + Vector3.UP * 0.45
 
-func _advance_progress() -> void:
+func _advance_progress(desired_lane: float) -> void:
 	var next_index := (progress_index + 1) % track_points.size()
-	var next_point: Vector3 = track_points[next_index]
-	if global_position.distance_squared_to(next_point) < 13.0:
+	# Measure against the same offset racing line the AI is actually following.
+	var next_point := _lane_point(next_index, desired_lane)
+	if global_position.distance_squared_to(next_point) < 12.25:
 		if next_index == 0:
 			completed_laps += 1
 		progress_index = next_index
